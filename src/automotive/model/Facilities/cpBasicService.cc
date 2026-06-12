@@ -25,9 +25,54 @@
 #include "ns3/rsrp-tag.h"
 #include "ns3/size-tag.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <unordered_map>
+#include <vector>
+
 namespace ns3 {
 
   NS_LOG_COMPONENT_DEFINE("CPBasicService");
+
+  namespace
+  {
+    constexpr double RMR_EPSILON = 1e-6;
+    std::unordered_map<uint64_t, std::set<uint64_t>> g_sharedRmrDeletedIdsByStation;
+
+    struct RmrCandidate
+    {
+      uint64_t stationId;
+      long stationType;
+      double frequency;
+      double positionChange;
+      double speedChange;
+      double distance;
+      double score = 0.0;
+    };
+
+    double
+    StableUnitProbability (uint64_t senderId, uint64_t objectId, int64_t timeBucket)
+    {
+      uint64_t value = senderId * 0x9e3779b97f4a7c15ULL;
+      value ^= objectId + 0xbf58476d1ce4e5b9ULL + (value << 6) + (value >> 2);
+      value ^= static_cast<uint64_t> (timeBucket) + 0x94d049bb133111ebULL + (value << 6) +
+               (value >> 2);
+      value ^= value >> 30;
+      value *= 0xbf58476d1ce4e5b9ULL;
+      value ^= value >> 27;
+      value *= 0x94d049bb133111ebULL;
+      value ^= value >> 31;
+      return static_cast<double> (value >> 11) * (1.0 / 9007199254740992.0);
+    }
+
+    bool
+    IsPedestrianObject (long stationType)
+    {
+      return stationType == StationType_pedestrian;
+    }
+  }
 
   CPBasicService::CPBasicService()
   {
@@ -58,8 +103,59 @@ namespace ns3 {
 
     m_vehicle=true;
     m_redundancy_mitigation = true;
+    m_cbr_adaptive_rmr = false;
+    m_rmr_forwarding_mode = RMR_FORWARDING_PRIMARY;
+    m_rmr_current_cbr = 0.0;
+    m_rmr_action_probability = 1.0;
+    m_rmr_cbr_low = 0.33;
+    m_rmr_cbr_high = 0.67;
+    m_rmr_frequency_weight = 1.0;
+    m_rmr_dynamics_weight = 1.0;
+    m_rmr_distance_weight = 1.0;
+    m_rmr_delete_low = 10;
+    m_rmr_delete_middle = 20;
+    m_rmr_delete_high = 40;
+    m_rmr_window_ms = 1000;
+    m_last_rmr_candidate_count = 0;
+    m_last_rmr_included_objects = 0;
+    m_last_rmr_deleted_objects = 0;
+    m_use_external_rmr_deleted_ids = false;
+    m_last_cpm_size_bytes = 0;
+    m_total_rmr_candidate_count = 0;
+    m_total_rmr_included_objects = 0;
+    m_total_rmr_deleted_objects = 0;
+    m_total_cpm_size_bytes = 0;
 
     m_cpm_sent=0;
+  }
+
+  void
+  CPBasicService::configureCbrAdaptiveRmr(double cbrLow,
+                                          double cbrHigh,
+                                          uint32_t deleteLow,
+                                          uint32_t deleteMiddle,
+                                          uint32_t deleteHigh)
+  {
+    if (cbrLow > cbrHigh)
+      {
+        NS_FATAL_ERROR ("RMR low CBR threshold must be lower than or equal to the high threshold");
+      }
+
+    m_rmr_cbr_low = cbrLow;
+    m_rmr_cbr_high = cbrHigh;
+    m_rmr_delete_low = deleteLow;
+    m_rmr_delete_middle = deleteMiddle;
+    m_rmr_delete_high = deleteHigh;
+  }
+
+  void
+  CPBasicService::configureRmrWeights(double frequencyWeight,
+                                      double dynamicsWeight,
+                                      double distanceWeight)
+  {
+    m_rmr_frequency_weight = frequencyWeight;
+    m_rmr_dynamics_weight = dynamicsWeight;
+    m_rmr_distance_weight = distanceWeight;
   }
 
   void
@@ -120,12 +216,19 @@ namespace ns3 {
     /* Get the last position of the reference point of this object lastly included in a CPM from the object pathHistory*/
     std::map<uint64_t, PHData_t>::reverse_iterator it = phPoints.rbegin ();
     it ++;
+    bool previousCpmFound = false;
     for(auto fromPrev = it; fromPrev!=phPoints.rend(); fromPrev++)
       {
         if (fromPrev->second.CPMincluded == true)
           {
             previousCPM = fromPrev->second;
+            previousCpmFound = true;
+            break;
           }
+      }
+    if (!previousCpmFound)
+      {
+        return true;
       }
     /* 1.b The Euclidian absolute distance between the current estimated position of the reference point of the
      * object and the estimated position of the reference point of this object lastly included in a CPM exceeds
@@ -150,6 +253,178 @@ namespace ns3 {
     return false;
   }
 
+  uint32_t
+  CPBasicService::getRmrDeletionBudget() const
+  {
+    if (!m_cbr_adaptive_rmr)
+      {
+        return 0;
+      }
+
+    if (m_rmr_current_cbr <= m_rmr_cbr_low)
+      {
+        return m_rmr_delete_low;
+      }
+    if (m_rmr_current_cbr <= m_rmr_cbr_high)
+      {
+        return m_rmr_delete_middle;
+      }
+    return m_rmr_delete_high;
+  }
+
+  std::set<uint64_t>
+  CPBasicService::selectCbrAdaptiveRmrDeletions(std::vector<LDM::returnedVehicleData_t>& LDM_POs)
+  {
+    std::set<uint64_t> deletedIds;
+    const uint32_t deletionBudget = getRmrDeletionBudget ();
+    const double actionProbability = std::max (0.0, std::min (1.0, m_rmr_action_probability));
+    if (deletionBudget == 0 || actionProbability <= 0.0)
+      {
+        return deletedIds;
+      }
+
+    std::vector<RmrCandidate> candidates;
+    const int64_t nowUs = Simulator::Now ().GetMicroSeconds ();
+    const int64_t windowUs = static_cast<int64_t> (m_rmr_window_ms) * 1000;
+
+    for (auto it = LDM_POs.begin (); it != LDM_POs.end (); ++it)
+      {
+        if (it->vehData.perceivedBy.getData () != (long) m_station_id)
+          {
+            continue;
+          }
+
+        if (m_redundancy_mitigation && !checkCPMconditions (it))
+          {
+            continue;
+          }
+
+        const auto phPoints = it->phData.getPHpoints ();
+        if (phPoints.empty ())
+          {
+            continue;
+          }
+
+        const PHData_t current = phPoints.rbegin ()->second;
+        PHData_t reference = current;
+        bool hasReference = false;
+        for (auto rit = phPoints.rbegin (); rit != phPoints.rend (); ++rit)
+          {
+            if (rit->second.CPMincluded)
+              {
+                reference = rit->second;
+                hasReference = true;
+                break;
+              }
+          }
+        if (!hasReference && phPoints.size () > 1)
+          {
+            auto rit = phPoints.rbegin ();
+            ++rit;
+            reference = rit->second;
+            hasReference = true;
+          }
+
+        uint32_t recentObservations = 0;
+        for (const auto& point : phPoints)
+          {
+            if (nowUs - static_cast<int64_t> (point.first) <= windowUs)
+              {
+                ++recentObservations;
+              }
+          }
+
+        double positionChange = 0.0;
+        double speedChange = 0.0;
+        if (hasReference)
+          {
+            positionChange = m_vdp->getCartesianDist (reference.lon,
+                                                       reference.lat,
+                                                       current.lon,
+                                                       current.lat);
+            speedChange = std::abs (reference.speed_ms - current.speed_ms);
+          }
+
+        double distance = std::numeric_limits<double>::max ();
+        if (it->vehData.xDistAbs.isAvailable () && it->vehData.yDistAbs.isAvailable ())
+          {
+            const double xMeters = static_cast<double> (it->vehData.xDistAbs.getData ()) / CENTI;
+            const double yMeters = static_cast<double> (it->vehData.yDistAbs.getData ()) / CENTI;
+            distance = std::sqrt ((xMeters * xMeters) + (yMeters * yMeters));
+          }
+        else
+          {
+            distance = m_vdp->getCartesianDist (m_vdp->getPosition ().lon,
+                                                m_vdp->getPosition ().lat,
+                                                it->vehData.lon,
+                                                it->vehData.lat);
+          }
+
+        RmrCandidate candidate;
+        candidate.stationId = it->vehData.stationID;
+        candidate.stationType = it->vehData.stationType;
+        candidate.frequency = static_cast<double> (recentObservations);
+        candidate.positionChange = positionChange;
+        candidate.speedChange = speedChange;
+        candidate.distance = distance;
+        candidates.push_back (candidate);
+      }
+
+    m_last_rmr_candidate_count = static_cast<uint32_t> (candidates.size ());
+    m_total_rmr_candidate_count += m_last_rmr_candidate_count;
+    if (candidates.empty ())
+      {
+        return deletedIds;
+      }
+
+    for (auto& candidate : candidates)
+      {
+        const double n = std::max (candidate.frequency, RMR_EPSILON);
+        const double l = std::max (candidate.positionChange, RMR_EPSILON);
+        const double v = std::max (candidate.speedChange, RMR_EPSILON);
+        const double distance = std::max (candidate.distance, RMR_EPSILON);
+        candidate.score = n / (distance * std::min (l, v));
+        if (!std::isfinite (candidate.score))
+          {
+            candidate.score = -std::numeric_limits<double>::infinity ();
+          }
+      }
+
+    std::sort (candidates.begin (),
+               candidates.end (),
+               [] (const RmrCandidate& left, const RmrCandidate& right) {
+                 const bool leftPedestrian = IsPedestrianObject (left.stationType);
+                 const bool rightPedestrian = IsPedestrianObject (right.stationType);
+                 if (leftPedestrian != rightPedestrian)
+                   {
+                     return !leftPedestrian;
+                   }
+                 if (left.score != right.score)
+                   {
+                     return left.score > right.score;
+                   }
+                 return left.stationId < right.stationId;
+               });
+
+    const uint32_t deleteCount =
+        std::min<uint32_t> (deletionBudget, static_cast<uint32_t> (candidates.size ()));
+    const int64_t timeBucket = m_rmr_window_ms > 0
+                                   ? nowUs / (static_cast<int64_t> (m_rmr_window_ms) * 1000)
+                                   : nowUs;
+    for (uint32_t index = 0; index < candidates.size () && deletedIds.size () < deleteCount; ++index)
+      {
+        if (StableUnitProbability (m_station_id, candidates[index].stationId, timeBucket) <=
+            actionProbability)
+          {
+            deletedIds.insert (candidates[index].stationId);
+          }
+      }
+
+    m_last_rmr_deleted_objects = static_cast<uint32_t> (deletedIds.size ());
+    m_total_rmr_deleted_objects += m_last_rmr_deleted_objects;
+    return deletedIds;
+  }
+
   void
   CPBasicService::generateAndEncodeCPM()
   {
@@ -164,6 +439,11 @@ namespace ns3 {
 
     long numberOfPOs = 0;
     long container_counter = 1;
+    m_last_rmr_candidate_count = 0;
+    m_last_rmr_included_objects = 0;
+    m_last_rmr_deleted_objects = 0;
+    m_last_rmr_deleted_ids.clear ();
+    m_last_cpm_size_bytes = 0;
 
     /* Collect data for mandatory containers */
     auto cpm = asn1cpp::makeSeq (CollectivePerceptionMessage);
@@ -188,6 +468,40 @@ namespace ns3 {
         std::vector<LDM::returnedVehicleData_t> LDM_POs;
         if (m_LDM->getAllPOs (LDM_POs)) // If there are any POs in the LDM
           {
+            std::set<uint64_t> rmrDeletedIds;
+            if (m_cbr_adaptive_rmr)
+              {
+                if (m_use_external_rmr_deleted_ids)
+                  {
+                    rmrDeletedIds = m_external_rmr_deleted_ids;
+                    m_last_rmr_deleted_objects = static_cast<uint32_t> (rmrDeletedIds.size ());
+                    m_total_rmr_deleted_objects += m_last_rmr_deleted_objects;
+                  }
+                else if (m_rmr_forwarding_mode == RMR_FORWARDING_OFFLOAD)
+                  {
+                    const auto sharedIt = g_sharedRmrDeletedIdsByStation.find (m_station_id);
+                    if (sharedIt != g_sharedRmrDeletedIdsByStation.end ())
+                      {
+                        rmrDeletedIds = sharedIt->second;
+                      }
+                    else
+                      {
+                        rmrDeletedIds = selectCbrAdaptiveRmrDeletions (LDM_POs);
+                      }
+                    m_last_rmr_deleted_objects = static_cast<uint32_t> (rmrDeletedIds.size ());
+                    m_total_rmr_deleted_objects += m_last_rmr_deleted_objects;
+                  }
+                else
+                  {
+                    rmrDeletedIds = selectCbrAdaptiveRmrDeletions (LDM_POs);
+                    if (m_rmr_forwarding_mode == RMR_FORWARDING_PRIMARY)
+                      {
+                        g_sharedRmrDeletedIdsByStation[m_station_id] = rmrDeletedIds;
+                      }
+                  }
+                m_last_rmr_deleted_ids = rmrDeletedIds;
+              }
+
             /* Fill Perceived Object Container as detailed in ETSI TS 103 324, Section 7.1.8 */
             std::vector<LDM::returnedVehicleData_t>::iterator it;
             for (it = LDM_POs.begin (); it != LDM_POs.end (); it++)
@@ -195,10 +509,18 @@ namespace ns3 {
 
                 if (it->vehData.perceivedBy.getData () != (long) m_station_id)
                   continue;
-                if (!checkCPMconditions (it) && m_redundancy_mitigation)
+                if (m_redundancy_mitigation && !checkCPMconditions (it))
                   continue;
-                else
+                const bool rmrDeleted =
+                    rmrDeletedIds.find (it->vehData.stationID) != rmrDeletedIds.end ();
+                if (m_cbr_adaptive_rmr)
                   {
+                    if (m_rmr_forwarding_mode == RMR_FORWARDING_PRIMARY && rmrDeleted)
+                      continue;
+                    if (m_rmr_forwarding_mode == RMR_FORWARDING_OFFLOAD && !rmrDeleted)
+                      continue;
+                  }
+                {
                     auto PO = asn1cpp::makeSeq (PerceivedObject);
                     asn1cpp::setField (PO->objectId, it->vehData.stationID);
                     long timeOfMeasurement =
@@ -282,6 +604,8 @@ namespace ns3 {
                                               computeTimestampUInt64 () / NANO_TO_MILLI);
                     //Increase number of POs for the numberOfPerceivedObjects field in cpmParameters container
                     numberOfPOs++;
+                    m_last_rmr_included_objects++;
+                    m_total_rmr_included_objects++;
                   }
               }
             if (numberOfPOs != 0)
@@ -406,6 +730,8 @@ namespace ns3 {
     }
 
     packet = Create<Packet> ((uint8_t*) encode_result.c_str(), encode_result.size());
+    m_last_cpm_size_bytes = packet->GetSize ();
+    m_total_cpm_size_bytes += m_last_cpm_size_bytes;
     //packet = Create<Packet> ((uint8_t*) bytes, length);
 
     dataRequest.BTPType = BTP_B; //!< BTP-B

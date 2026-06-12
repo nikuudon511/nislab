@@ -15,6 +15,8 @@
 #include "ns3/ldm-utils.h"
 #include "signalInfoUtils.h"
 
+#include <set>
+
 extern "C" {
   #include "ns3/CollectivePerceptionMessage.h"
 }
@@ -35,6 +37,13 @@ namespace ns3
 class CPBasicService: public Object, public SignalInfoUtils
 { 
 public:
+  enum RmrForwardingMode
+  {
+    RMR_FORWARDING_PRIMARY = 0,
+    RMR_FORWARDING_OFFLOAD = 1,
+    RMR_FORWARDING_DUPLICATE = 2
+  };
+
   /**
    * \brief Constructor
    *
@@ -122,6 +131,32 @@ public:
   void setRedundancyMitigation(bool choice){m_redundancy_mitigation = choice;}
   void disableRedundancyMitigation(){m_redundancy_mitigation = false;}
 
+  void setCbrAdaptiveRmr(bool choice){m_cbr_adaptive_rmr = choice;}
+  void setRmrCurrentCbr(double cbr){m_rmr_current_cbr = cbr;}
+  void setRmrActionProbability(double probability){m_rmr_action_probability = probability;}
+  void setRmrForwardingMode(RmrForwardingMode mode){m_rmr_forwarding_mode = mode;}
+  void setExternalRmrDeletedIds(const std::set<uint64_t>& ids){m_external_rmr_deleted_ids = ids; m_use_external_rmr_deleted_ids = true;}
+  void clearExternalRmrDeletedIds(){m_external_rmr_deleted_ids.clear(); m_use_external_rmr_deleted_ids = false;}
+  const std::set<uint64_t>& getLastRmrDeletedIds() const {return m_last_rmr_deleted_ids;}
+  void configureCbrAdaptiveRmr(double cbrLow,
+                               double cbrHigh,
+                               uint32_t deleteLow,
+                               uint32_t deleteMiddle,
+                               uint32_t deleteHigh);
+  void configureRmrWeights(double frequencyWeight,
+                           double dynamicsWeight,
+                           double distanceWeight);
+  void setRmrWindowMs(uint32_t windowMs){m_rmr_window_ms = windowMs;}
+  uint32_t getLastRmrCandidateCount() const {return m_last_rmr_candidate_count;}
+  uint32_t getLastRmrIncludedObjectCount() const {return m_last_rmr_included_objects;}
+  uint32_t getLastRmrDeletedObjectCount() const {return m_last_rmr_deleted_objects;}
+  uint32_t getLastCpmSizeBytes() const {return m_last_cpm_size_bytes;}
+  uint64_t getTotalRmrCandidateCount() const {return m_total_rmr_candidate_count;}
+  uint64_t getTotalRmrIncludedObjectCount() const {return m_total_rmr_included_objects;}
+  uint64_t getTotalRmrDeletedObjectCount() const {return m_total_rmr_deleted_objects;}
+  uint64_t getTotalCpmSizeBytes() const {return m_total_cpm_size_bytes;}
+  uint64_t getCpmSent() const {return m_cpm_sent;}
+
   uint64_t getWannabeSent() {return m_wannabe_sent;}
 
   const long T_GenCpmMin_ms = 100;
@@ -146,6 +181,8 @@ private:
    * @return
    */
   bool checkCPMconditions(std::vector<LDM::returnedVehicleData_t>::iterator it);
+  std::set<uint64_t> selectCbrAdaptiveRmrDeletions(std::vector<LDM::returnedVehicleData_t>& LDM_POs);
+  uint32_t getRmrDeletionBudget() const;
   double cartesian_dist(double lon1, double lat1, double lon2, double lat2);
 
   std::function<void(asn1cpp::Seq<CollectivePerceptionMessage>, Address)> m_CPReceiveCallback;  //! Callback function for received CPMs
@@ -168,6 +205,30 @@ private:
   bool m_real_time; //! Flag to specify if using real time or simulation time for the CPM timestamps
   bool m_vehicle;
   bool m_redundancy_mitigation; //! Flag to specify if using redundancy mitigation defined for the CPM generation
+  bool m_cbr_adaptive_rmr;
+  RmrForwardingMode m_rmr_forwarding_mode;
+  double m_rmr_current_cbr;
+  double m_rmr_action_probability;
+  double m_rmr_cbr_low;
+  double m_rmr_cbr_high;
+  double m_rmr_frequency_weight;
+  double m_rmr_dynamics_weight;
+  double m_rmr_distance_weight;
+  uint32_t m_rmr_delete_low;
+  uint32_t m_rmr_delete_middle;
+  uint32_t m_rmr_delete_high;
+  uint32_t m_rmr_window_ms;
+  uint32_t m_last_rmr_candidate_count;
+  uint32_t m_last_rmr_included_objects;
+  uint32_t m_last_rmr_deleted_objects;
+  std::set<uint64_t> m_last_rmr_deleted_ids;
+  std::set<uint64_t> m_external_rmr_deleted_ids;
+  bool m_use_external_rmr_deleted_ids;
+  uint32_t m_last_cpm_size_bytes;
+  uint64_t m_total_rmr_candidate_count;
+  uint64_t m_total_rmr_included_objects;
+  uint64_t m_total_rmr_deleted_objects;
+  uint64_t m_total_cpm_size_bytes;
   VDP* m_vdp; //! VDP object
   Ptr<TraciClient> m_client;
 
