@@ -1,0 +1,18 @@
+<edges>
+  <edge id="highway_eb"
+        from="eb_start"
+        to="eb_end"
+        priority="3"
+        numLanes="3"
+        speed="27.78"
+        width="4.0"
+        spreadType="center"/>
+  <edge id="highway_wb"
+        from="wb_start"
+        to="wb_end"
+        priority="3"
+        numLanes="3"
+        speed="27.78"
+        width="4.0"
+        spreadType="center"/>
+</edges>

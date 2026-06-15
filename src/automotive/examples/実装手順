@@ -1,0 +1,36 @@
+ 1. 評価ロガーを先に作る
+     まず制御なしで、必要指標を全部CSVに出す。ここが基準になります。
+
+     出すべき指標:
+     CBR, PRR, packet loss, latency, CPM size, object count, deleted object count, vehicle recognition rate, pedestrian/high-priority recognition
+     rate, V2V tx, V2N2V tx, route switch count, CBR threshold exceed time.
+
+  2. 修論ベースの反応型RMRを再現
+     PDFの方式に合わせて、Frequency / Dynamics / Distance を組み合わせた冗長度スコアを作る。CBRに応じて削除数を low/middle/high で変える。
+
+     ここで目的は「関連研究を正しく再現する」ことです。性能改善はまだ狙わない。
+
+  3. 予測混雑度 + V2V単体を実装
+     同じRMRを使い、入力だけを現在CBRから予測混雑度へ変える。
+
+     最初の予測器は複雑なMLではなく、
+     CBR, CBR変化率, 送信CPMサイズ, 車両数, CPM送信数
+     を使った軽い予測で十分です。まずは 1-3秒後のCBR予測 を出す形が良いです。
+
+  4. RSU/MECつきV2N2Vを実装
+     車両からNR/LTE UuでMECへ送信し、MECが対象車両へ再配信する。これは現在のNR sidelink代替ではなく、EPC/RemoteHost経由にするべきです。
+
+     経路はこうします。
+
+     Vehicle UE -> gNB/RSU -> EPC -> MEC RemoteHost -> EPC -> gNB/RSU -> Vehicle UE
+
+     MEC側には処理遅延、キュー長、再配信対象、破棄数をログに出す。
+
+  5. 3手法を同一条件で切替実行
+     実行オプションで方式を切り替えます。
+
+     --method=reactive-rmr
+     --method=predictive-rmr-v2v
+     --method=predictive-rmr-v2n2v
+
+     追加で --method=no-control も入れると、論文の説得力が上がります。

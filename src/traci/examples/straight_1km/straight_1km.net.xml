@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-05-31T17:24:35.708212+09:00 by Eclipse SUMO netconvert 1.26.0
+<netconvertConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
+
+    <input>
+        <node-files value="src/traci/examples/straight_1km/straight_1km.nod.xml"/>
+        <edge-files value="src/traci/examples/straight_1km/straight_1km.edg.xml"/>
+    </input>
+
+    <output>
+        <output-file value="src/traci/examples/straight_1km/straight_1km.net.xml"/>
+    </output>
+
+</netconvertConfiguration>
+-->
+
+<net version="1.20" junctionCornerDetail="5" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
+
+    <location netOffset="0.00,0.00" convBoundary="0.00,0.00,2000.00,0.00" origBoundary="0.00,0.00,2000.00,0.00" projParameter="!"/>
+
+    <edge id=":merge_0" function="internal">
+        <lane id=":merge_0_0" index="0" speed="18.05" length="8.00" shape="1596.00,-1.60 1604.00,-1.60"/>
+    </edge>
+
+    <edge id="bottleneck" from="merge" to="end" priority="-1">
+        <lane id="bottleneck_0" index="0" speed="8.33" length="396.00" shape="1604.00,-1.60 2000.00,-1.60"/>
+    </edge>
+    <edge id="mainline" from="start" to="merge" priority="-1">
+        <lane id="mainline_0" index="0" speed="27.78" length="1596.00" shape="0.00,-4.80 1596.00,-4.80"/>
+        <lane id="mainline_1" index="1" speed="27.78" length="1596.00" shape="0.00,-1.60 1596.00,-1.60"/>
+    </edge>
+
+    <junction id="end" type="dead_end" x="2000.00" y="0.00" incLanes="bottleneck_0" intLanes="" shape="2000.00,-3.20 2000.00,0.00"/>
+    <junction id="merge" type="priority" x="1600.00" y="0.00" incLanes="mainline_0 mainline_1" intLanes=":merge_0_0" shape="1604.00,0.00 1604.00,-3.20 1600.97,-4.03 1599.03,-5.57 1597.79,-6.16 1596.00,-6.40 1596.00,0.00">
+        <request index="0" response="0" foes="0" cont="0"/>
+    </junction>
+    <junction id="start" type="dead_end" x="0.00" y="0.00" incLanes="" intLanes="" shape="0.00,0.00 0.00,-6.40"/>
+
+    <connection from="mainline" to="bottleneck" fromLane="1" toLane="0" via=":merge_0_0" dir="s" state="M"/>
+
+    <connection from=":merge_0" to="bottleneck" fromLane="0" toLane="0" dir="s" state="M"/>
+
+</net>

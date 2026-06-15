@@ -51,7 +51,6 @@ namespace ns3 {
   {
     using namespace boost::geometry::strategy::transform;
     libsumo::TraCIPosition egoPosXY=m_client->TraCIAPI::vehicle.getPosition(m_id);
-    libsumo::TraCIPosition egoPos = m_client->TraCIAPI::simulation.convertXYtoLonLat (egoPosXY.x,egoPosXY.y);
     std::vector<std::string> allIDs;
     std::vector<std::pair<std::string,double>> rangeIDs,sensedIDs;
     // Get all IDs in the simulation
@@ -62,11 +61,11 @@ namespace ns3 {
         //For all IDs, except the egoID
         if(allIDs[i].compare(m_id))
           {
-            //Compute the vehicle distance from the egoVehicle's front bumper
-            double f;
-            libsumo::TraCIPosition geoPos=m_client->TraCIAPI::vehicle.getPosition(allIDs[i]);
-            geoPos=m_client->TraCIAPI::simulation.convertXYtoLonLat (geoPos.x,geoPos.y);
-            f = compute_sensordist (egoPos.y,egoPos.x,geoPos.y,geoPos.x);
+            // SUMO's projected XY coordinates are in meters and work for both
+            // synthetic maps and geo-projected maps.
+            libsumo::TraCIPosition objectPosXY=m_client->TraCIAPI::vehicle.getPosition(allIDs[i]);
+            double f = sqrt (pow (objectPosXY.x - egoPosXY.x, 2) +
+                             pow (objectPosXY.y - egoPosXY.y, 2));
             if (f<=m_sensorRange)
               {
                 //If the vehicle is closer than the sensor range, add to preliminary in range list

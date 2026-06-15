@@ -187,6 +187,32 @@ build_lib_example(
        ${libautomotive}
 )
 
+build_lib_example(
+        NAME v2v-hybrid-cbr-80211p-nrv2x
+        SOURCE_FILES v2v-hybrid-cbr-80211p-nrv2x.cc
+        LIBRARIES_TO_LINK
+        ${libautomotive}
+        ${liblte}
+        ${libnr}
+        ${libpoint-to-point}
+        ${libinternet}
+        ${libwave}
+        ${libtraci}
+)
+
+build_lib_example(
+        NAME v2v-hybrid-nr-v2n2v
+        SOURCE_FILES v2v-hybrid-nr-v2n2v.cc
+        LIBRARIES_TO_LINK
+        ${libautomotive}
+        ${liblte}
+        ${libnr}
+        ${libpoint-to-point}
+        ${libinternet}
+        ${libwave}
+        ${libtraci}
+)
+
 #build_lib_example(
 #        NAME v2v-coexistence-80211p-ltev2x
 #        SOURCE_FILES v2v-coexistence-80211p-ltev2x.cc
@@ -213,4 +239,15 @@ build_lib_example(
         SOURCE_FILES v2v-cam-exchange-sionna-ltev2x.cc
         LIBRARIES_TO_LINK
         ${libautomotive}
+)
+
+
+build_lib_example(
+        NAME myfirst
+        SOURCE_FILES myfirst.cc
+        LIBRARIES_TO_LINK
+        ${libautomotive}
+        ${libwave}
+        ${libinternet}
+        ${libtraci}
 )

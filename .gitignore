@@ -404,3 +404,9 @@ results/
   *.log
   opencv/
   opencv_contrib/
+# Local generated outputs
+/hybrid-*.csv
+/opencv/
+/opencv_contrib/
+*.log
+*.pcap
