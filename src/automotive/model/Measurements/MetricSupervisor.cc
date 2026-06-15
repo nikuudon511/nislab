@@ -22,6 +22,8 @@
 
 #include "MetricSupervisor.h"
 #include "ns3/csv-utils.h"
+#include <algorithm>
+#include <cmath>
 #include <sstream>
 #include <cfloat>
 
@@ -41,6 +43,44 @@ std::unordered_map<std::string, Time> currentBusyCBR;
 std::unordered_map<std::string, std::pair<Time, WifiPhyState>> nodeLastState80211p;
 std::unordered_map<std::string, Time> nodeDurationStateNr;
 Time lastCBRCheck = Time(-1.0);
+
+static double
+MetricSupervisorPercentile (std::vector<double> values, double percentile)
+{
+  if (values.empty ())
+    {
+      return 0.0;
+    }
+  percentile = std::max (0.0, std::min (100.0, percentile));
+  std::sort (values.begin (), values.end ());
+  const double rank = (percentile / 100.0) * static_cast<double> (values.size () - 1);
+  const auto lower = static_cast<std::size_t> (std::floor (rank));
+  const auto upper = static_cast<std::size_t> (std::ceil (rank));
+  if (lower == upper)
+    {
+      return values[lower];
+    }
+  const double weight = rank - static_cast<double> (lower);
+  return values[lower] + ((values[upper] - values[lower]) * weight);
+}
+
+double
+MetricSupervisor::getLatencyPercentile_overall (double percentile) const
+{
+  return MetricSupervisorPercentile (m_latency_samples_ms, percentile);
+}
+
+double
+MetricSupervisor::getLatencyPercentile_messagetype (messageType_e messagetype,
+                                                    double percentile) const
+{
+  const auto it = m_latency_samples_ms_per_messagetype.find (messagetype);
+  if (it == m_latency_samples_ms_per_messagetype.end ())
+    {
+      return 0.0;
+    }
+  return MetricSupervisorPercentile (it->second, percentile);
+}
 
 TypeId
 MetricSupervisor::GetTypeId ()
@@ -241,6 +281,7 @@ MetricSupervisor::signalReceivedPacket(std::string buf, uint64_t nodeID)
     {
       curr_latency_ms = static_cast<double>(Simulator::Now ().GetNanoSeconds () - m_latency_map[buf])/1000000.0;
       m_count_latency++;
+      m_latency_samples_ms.push_back (curr_latency_ms);
 
       m_avg_latency_ms += (curr_latency_ms-m_avg_latency_ms)/m_count_latency;
 
@@ -298,6 +339,7 @@ MetricSupervisor::signalReceivedPacket(std::string buf, uint64_t nodeID)
         }
 
       m_count_latency_per_messagetype[messagetype]++;
+      m_latency_samples_ms_per_messagetype[messagetype].push_back (curr_latency_ms);
       m_avg_latency_ms_per_messagetype[messagetype] += (curr_latency_ms - m_avg_latency_ms_per_messagetype[messagetype])/m_count_latency_per_messagetype[messagetype];
 
       if(m_prr_verbose_stdout == true) {

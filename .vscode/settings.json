@@ -1,16 +1,31 @@
 {
-"C_Cpp.intelliSenseEngine": "disabled",
-"clangd.arguments": [
-  "--compile-commands-dir=cmake-build-debug",
-  "--background-index"
-],
-"cmake.debugConfig": {
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "clangd.arguments": [
+    "--compile-commands-dir=cmake-build-debug",
+    "--background-index"
+  ],
+  "cmake.debugConfig": {
     "args": [
-        "--sumo-gui=true"
+      "--sumo-gui=true"
     ],
     "env": {
-        "DISPLAY": "",
-        "LIBGL_ALWAYS_INDIRECT": "1",
+      "DISPLAY": "",
+      "LIBGL_ALWAYS_INDIRECT": "1"
     }
-},
+  },
+  "files.watcherExclude": {
+    "**/results/**": true,
+    "**/opencv/**": true,
+    "**/opencv_contrib/**": true,
+    "**/build/**": true,
+    "**/cmake-cache/**": true
+  },
+  "search.exclude": {
+    "**/results/**": true,
+    "**/opencv/**": true,
+    "**/opencv_contrib/**": true,
+    "**/build/**": true,
+    "**/cmake-cache/**": true
+  },
+  "git.autorefresh": false
 }

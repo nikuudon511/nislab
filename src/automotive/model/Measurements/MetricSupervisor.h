@@ -5,6 +5,7 @@
 #include <list>
 #include <unordered_map>
 #include <string>
+#include <vector>
 #include "ns3/traci-client.h"
 #include "ns3/event-id.h"
 #include "ns3/wifi-phy-state.h"
@@ -121,6 +122,7 @@ public:
    * @return  The average latency [ms]
    */
   double getAverageLatency_overall(void) {return m_avg_latency_ms;}
+  double getLatencyPercentile_overall(double percentile) const;
 
   /**
    * @brief Get the average SINR for all the messages received in the simulation.
@@ -330,6 +332,7 @@ public:
    * @return  The average latency [ms]
    */
   double getAverageLatency_messagetype(messageType_e messagetype) {return m_avg_latency_ms_per_messagetype[messagetype];}
+  double getLatencyPercentile_messagetype(messageType_e messagetype, double percentile) const;
   /**
    * @brief Get the total number of packets transmitted given a specific message type.
    * @param messagetype  The ETSI message type.
@@ -505,6 +508,7 @@ private:
 
   int m_count = 0;
   uint64_t m_count_latency = 0;
+  std::vector<double> m_latency_samples_ms;
   uint64_t m_total_tx = 0.0;
   uint64_t m_total_rx = 0.0;
   double m_avg_PRR = 0.0;
@@ -539,6 +543,7 @@ private:
   std::unordered_map<messageType_e,double> m_avg_latency_ms_per_messagetype; //! key: message type, value: latency
   std::unordered_map<messageType_e,int> m_count_per_messagetype; //! key: message type, value: count
   std::unordered_map<messageType_e,uint64_t> m_count_latency_per_messagetype; //! key: message type, value: latency
+  std::unordered_map<messageType_e,std::vector<double>> m_latency_samples_ms_per_messagetype;
   std::unordered_map<messageType_e,uint64_t> m_ntx_per_messagetype; //! key: message type, value: total number of packets transmitted per message type
   std::unordered_map<messageType_e,uint64_t> m_nrx_per_messagetype; //! key: message type, value: total number of packets received per message type
   std::unordered_map<messageType_e,uint64_t> m_count_nvehbsln_per_messagetype; //! key: message type, value: count for average number of vehicles within the baseline computation

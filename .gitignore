@@ -397,3 +397,10 @@ distance_rssi_int_extra.csv
 VAM_metrics.csv
 src/automotive/examples/v2v-student-application-80211p-denm.cc
 .vscode/*
+
+results/
+  hybrid-*.csv
+  *.pcap
+  *.log
+  opencv/
+  opencv_contrib/
