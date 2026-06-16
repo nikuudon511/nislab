@@ -5,10 +5,10 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT_DIR"
 
 SIM_TIME=${SIM_TIME:-120}
-METHODS=${METHODS:-"no-control reactive-rmr predictive-rmr-v2v predictive-rmr-v2n2v"}
-SUMO_FOLDER=${SUMO_FOLDER:-src/automotive/examples/sumo_files_nr_loop_1km/}
-MOB_TRACE=${MOB_TRACE:-cars_300_loop.rou.xml}
-SUMO_CONFIG=${SUMO_CONFIG:-src/automotive/examples/sumo_files_nr_loop_1km/map_loop_1km.sumo.cfg}
+METHODS=${METHODS:-"no-control predictive-rmr-v2v v2n2v-all-object v2n2v-high-priority-only v2n2v-adaptive-probability"}
+SUMO_FOLDER=${SUMO_FOLDER:-src/automotive/examples/sumo_files_nr_loop_1km_bidirectional/}
+MOB_TRACE=${MOB_TRACE:-cars_300_loop_bidirectional.rou.xml}
+SUMO_CONFIG=${SUMO_CONFIG:-src/automotive/examples/sumo_files_nr_loop_1km_bidirectional/map_loop_1km_bidirectional.sumo.cfg}
 SUMO_PORT=${SUMO_PORT:-3400}
 OUT_DIR=${OUT_DIR:-/tmp/van3twin_results/hybrid_nr_v2n2v_eval}
 
@@ -30,21 +30,30 @@ PREDICTOR_ACTIVE_VEHICLE_WEIGHT=${PREDICTOR_ACTIVE_VEHICLE_WEIGHT:-0}
 
 MEC_BACKHAUL_DELAY_MS=${MEC_BACKHAUL_DELAY_MS:-10}
 MEC_PROCESSING_DELAY_MS=${MEC_PROCESSING_DELAY_MS:-0}
-MEC_FORWARD_RANGE=${MEC_FORWARD_RANGE:-0}
+MEC_FORWARD_RANGE=${MEC_FORWARD_RANGE:-200}
 MEC_RECOVERY_POLICY=${MEC_RECOVERY_POLICY:-staged}
+MEC_OBJECT_POLICY=${MEC_OBJECT_POLICY:-all-objects}
+MEC_ADAPTIVE_LOW_MAX_PROB=${MEC_ADAPTIVE_LOW_MAX_PROB:-0.5}
 MEC_MIN_HOLD_TIME=${MEC_MIN_HOLD_TIME:-5}
 MEC_IDEAL_LINK=${MEC_IDEAL_LINK:-true}
 MEC_IDEAL_LATENCY_MS=${MEC_IDEAL_LATENCY_MS:-50}
+MEC_IDEAL_LATENCY_STDDEV_MS=${MEC_IDEAL_LATENCY_STDDEV_MS:-20}
+MEC_IDEAL_LATENCY_MIN_MS=${MEC_IDEAL_LATENCY_MIN_MS:-20}
+MEC_IDEAL_LATENCY_MAX_MS=${MEC_IDEAL_LATENCY_MAX_MS:-150}
 MEC_IDEAL_CPM_INTERVAL_MS=${MEC_IDEAL_CPM_INTERVAL_MS:-100}
 MEC_IDEAL_PACKET_SIZE=${MEC_IDEAL_PACKET_SIZE:-500}
+MEC_IDEAL_DL_PDR=${MEC_IDEAL_DL_PDR:-1.0}
+MAX_COMMUNICATION_VEHICLES=${MAX_COMMUNICATION_VEHICLES:-100}
 
 PRIORITY_DISTANCE=${PRIORITY_DISTANCE:-100}
 PRIORITY_CLOSING_SPEED=${PRIORITY_CLOSING_SPEED:-3}
 PRIORITY_TTC=${PRIORITY_TTC:-5}
-SENSOR_RANGE=${SENSOR_RANGE:-100}
+SENSOR_RANGE=${SENSOR_RANGE:-30}
 ORR_RANGE=${ORR_RANGE:-200}
-HIGH_PRIORITY_CPM_RECOGNITION_TTL=${HIGH_PRIORITY_CPM_RECOGNITION_TTL:-0.5}
-LOW_PRIORITY_CPM_RECOGNITION_TTL=${LOW_PRIORITY_CPM_RECOGNITION_TTL:-1.0}
+HIGH_PRIORITY_CPM_RECOGNITION_TTL=${HIGH_PRIORITY_CPM_RECOGNITION_TTL:-0.2}
+LOW_PRIORITY_CPM_RECOGNITION_TTL=${LOW_PRIORITY_CPM_RECOGNITION_TTL:-0.5}
+THESIS_EVAL_INTERVAL=${THESIS_EVAL_INTERVAL:-1}
+OBSERVATION_LOG_INTERVAL=${OBSERVATION_LOG_INTERVAL:-1}
 
 NR_BG=${NR_BG:-true}
 NR_BG_NODES=${NR_BG_NODES:-6}
@@ -77,11 +86,28 @@ header_written=false
 run_port=$SUMO_PORT
 
 for method in $METHODS; do
+  run_method=$method
+  run_mec_object_policy=$MEC_OBJECT_POLICY
+  case "$method" in
+    v2n2v-all-object)
+      run_method="predictive-rmr-v2n2v"
+      run_mec_object_policy="all-objects"
+      ;;
+    v2n2v-high-priority-only)
+      run_method="predictive-rmr-v2n2v"
+      run_mec_object_policy="high-priority-only"
+      ;;
+    v2n2v-adaptive-probability)
+      run_method="predictive-rmr-v2n2v"
+      run_mec_object_policy="adaptive-probability"
+      ;;
+  esac
+
   RUN_DIR="$OUT_DIR/$method"
   mkdir -p "$RUN_DIR"
 
   ./ns3 run "v2v-hybrid-nr-v2n2v \
-    --method=$method \
+    --method=$run_method \
     --sumo-gui=false \
     --sim-time=$SIM_TIME \
     --sumo-folder=$SUMO_FOLDER \
@@ -106,11 +132,18 @@ for method in $METHODS; do
     --mec-processing-delay-ms=$MEC_PROCESSING_DELAY_MS \
     --mec-forward-range=$MEC_FORWARD_RANGE \
     --mec-recovery-policy=$MEC_RECOVERY_POLICY \
+    --mec-object-policy=$run_mec_object_policy \
+    --mec-adaptive-low-max-prob=$MEC_ADAPTIVE_LOW_MAX_PROB \
     --mec-min-hold-time=$MEC_MIN_HOLD_TIME \
     --mec-ideal-link=$MEC_IDEAL_LINK \
     --mec-ideal-latency-ms=$MEC_IDEAL_LATENCY_MS \
+    --mec-ideal-latency-stddev-ms=$MEC_IDEAL_LATENCY_STDDEV_MS \
+    --mec-ideal-latency-min-ms=$MEC_IDEAL_LATENCY_MIN_MS \
+    --mec-ideal-latency-max-ms=$MEC_IDEAL_LATENCY_MAX_MS \
     --mec-ideal-cpm-interval-ms=$MEC_IDEAL_CPM_INTERVAL_MS \
     --mec-ideal-packet-size=$MEC_IDEAL_PACKET_SIZE \
+    --mec-ideal-dl-pdr=$MEC_IDEAL_DL_PDR \
+    --max-communication-vehicles=$MAX_COMMUNICATION_VEHICLES \
     --priority-distance=$PRIORITY_DISTANCE \
     --priority-closing-speed=$PRIORITY_CLOSING_SPEED \
     --priority-ttc=$PRIORITY_TTC \
@@ -128,6 +161,8 @@ for method in $METHODS; do
     --nr-mcs=$NR_MCS \
     --nr-sensing=$NR_SENSING \
     --nr-channel-randomness=$NR_CHANNEL_RANDOMNESS \
+    --thesis-eval-interval=$THESIS_EVAL_INTERVAL \
+    --observation-log-interval=$OBSERVATION_LOG_INTERVAL \
     --cbr-log=$RUN_DIR/channel.csv \
     --route-log=$RUN_DIR/route.csv \
     --observation-log=$RUN_DIR/observation.csv \
@@ -137,7 +172,7 @@ for method in $METHODS; do
     head -n 1 "$RUN_DIR/summary.csv" > "$SUMMARY"
     header_written=true
   fi
-  tail -n +2 "$RUN_DIR/summary.csv" >> "$SUMMARY"
+  awk -F, -v OFS=, -v label="$method" 'NR > 1 {$1 = label; print}' "$RUN_DIR/summary.csv" >> "$SUMMARY"
   run_port=$((run_port + 1))
 done
 

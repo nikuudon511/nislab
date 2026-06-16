@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<connections>
+  <connection from="loop_0" to="loop_1" fromLane="0" toLane="0"/>
+  <connection from="loop_0" to="loop_1" fromLane="1" toLane="1"/>
+  <connection from="loop_0" to="loop_1" fromLane="2" toLane="2"/>
+  <connection from="loop_1" to="loop_2" fromLane="0" toLane="0"/>
+  <connection from="loop_1" to="loop_2" fromLane="1" toLane="1"/>
+  <connection from="loop_1" to="loop_2" fromLane="2" toLane="2"/>
+  <connection from="loop_2" to="loop_3" fromLane="0" toLane="0"/>
+  <connection from="loop_2" to="loop_3" fromLane="1" toLane="1"/>
+  <connection from="loop_2" to="loop_3" fromLane="2" toLane="2"/>
+  <connection from="loop_3" to="loop_0" fromLane="0" toLane="0"/>
+  <connection from="loop_3" to="loop_0" fromLane="1" toLane="1"/>
+  <connection from="loop_3" to="loop_0" fromLane="2" toLane="2"/>
+  <connection from="loop_r2" to="loop_r1" fromLane="0" toLane="0"/>
+  <connection from="loop_r2" to="loop_r1" fromLane="1" toLane="1"/>
+  <connection from="loop_r2" to="loop_r1" fromLane="2" toLane="2"/>
+  <connection from="loop_r1" to="loop_r0" fromLane="0" toLane="0"/>
+  <connection from="loop_r1" to="loop_r0" fromLane="1" toLane="1"/>
+  <connection from="loop_r1" to="loop_r0" fromLane="2" toLane="2"/>
+  <connection from="loop_r0" to="loop_r3" fromLane="0" toLane="0"/>
+  <connection from="loop_r0" to="loop_r3" fromLane="1" toLane="1"/>
+  <connection from="loop_r0" to="loop_r3" fromLane="2" toLane="2"/>
+  <connection from="loop_r3" to="loop_r2" fromLane="0" toLane="0"/>
+  <connection from="loop_r3" to="loop_r2" fromLane="1" toLane="1"/>
+  <connection from="loop_r3" to="loop_r2" fromLane="2" toLane="2"/>
+</connections>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<additional>
+  <poi id="poi_0" type="rsu" x="0.00" y="0.00" color="0,0,255"/><!-- V2X:STATION -->
+  <poi id="poi_1" type="rsu" x="125.00" y="0.00" color="0,0,255"/><!-- V2X:STATION -->
+  <poi id="poi_2" type="rsu" x="250.00" y="0.00" color="0,0,255"/><!-- V2X:STATION -->
+  <poi id="poi_3" type="rsu" x="250.00" y="125.00" color="0,0,255"/><!-- V2X:STATION -->
+  <poi id="poi_4" type="rsu" x="250.00" y="250.00" color="0,0,255"/><!-- V2X:STATION -->
+  <poi id="poi_5" type="rsu" x="125.00" y="250.00" color="0,0,255"/><!-- V2X:STATION -->
+  <poi id="poi_6" type="rsu" x="0.00" y="250.00" color="0,0,255"/><!-- V2X:STATION -->
+  <poi id="poi_7" type="rsu" x="0.00" y="125.00" color="0,0,255"/><!-- V2X:STATION -->
+</additional>
