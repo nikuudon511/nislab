@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <additional>
-  <!-- Thin pale-yellow guides for the CAV lane: one inner/median-side lane per direction. -->
-  <poly id="cav_lane_cw_bottom" color="255,245,170" fill="1" layer="10" shape="0,-2.8 250,-2.8 250,-0.4 0,-0.4"/>
-  <poly id="cav_lane_cw_right" color="255,245,170" fill="1" layer="10" shape="250.4,0 252.8,0 252.8,250 250.4,250"/>
-  <poly id="cav_lane_cw_top" color="255,245,170" fill="1" layer="10" shape="0,250.4 250,250.4 250,252.8 0,252.8"/>
-  <poly id="cav_lane_cw_left" color="255,245,170" fill="1" layer="10" shape="-2.8,0 -0.4,0 -0.4,250 -2.8,250"/>
-
-  <poly id="cav_lane_ccw_bottom" color="255,245,170" fill="1" layer="10" shape="0,0.4 250,0.4 250,2.8 0,2.8"/>
-  <poly id="cav_lane_ccw_right" color="255,245,170" fill="1" layer="10" shape="247.2,0 249.6,0 249.6,250 247.2,250"/>
-  <poly id="cav_lane_ccw_top" color="255,245,170" fill="1" layer="10" shape="0,247.2 250,247.2 250,249.6 0,249.6"/>
-  <poly id="cav_lane_ccw_left" color="255,245,170" fill="1" layer="10" shape="0.4,0 2.8,0 2.8,250 0.4,250"/>
+  <!-- Thin pale-yellow guides aligned with generated lane index 2 centerlines. -->
+  <poly id="cav_lane_cw_bottom" color="255,245,170" fill="1" layer="10" shape="13.6,-2.4 486.4,-2.4 486.4,-0.8 13.6,-0.8"/>
+  <poly id="cav_lane_cw_right" color="255,245,170" fill="1" layer="10" shape="500.8,13.6 502.4,13.6 502.4,486.4 500.8,486.4"/>
+  <poly id="cav_lane_cw_top" color="255,245,170" fill="1" layer="10" shape="486.4,500.8 13.6,500.8 13.6,502.4 486.4,502.4"/>
+  <poly id="cav_lane_cw_left" color="255,245,170" fill="1" layer="10" shape="-2.4,486.4 -0.8,486.4 -0.8,13.6 -2.4,13.6"/>
+  <poly id="cav_lane_ccw_bottom" color="255,245,170" fill="1" layer="10" shape="486.4,0.8 13.6,0.8 13.6,2.4 486.4,2.4"/>
+  <poly id="cav_lane_ccw_right" color="255,245,170" fill="1" layer="10" shape="497.6,486.4 499.2,486.4 499.2,13.6 497.6,13.6"/>
+  <poly id="cav_lane_ccw_top" color="255,245,170" fill="1" layer="10" shape="13.6,497.6 486.4,497.6 486.4,499.2 13.6,499.2"/>
+  <poly id="cav_lane_ccw_left" color="255,245,170" fill="1" layer="10" shape="0.8,13.6 2.4,13.6 2.4,486.4 0.8,486.4"/>
 </additional>

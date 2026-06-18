@@ -1,306 +1,212 @@
 <routes>
   <vType id="cav100" accel="2.6" decel="4.5" sigma="0.5" length="5" maxSpeed="27.78" color="0,80,255" laneChangeMode="512"/>
-  <vType id="human100" accel="2.6" decel="4.5" sigma="0.5" length="5" maxSpeed="27.78" color="150,150,150"/>
-  <route id="loop_cw" edges="loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3"/>
-  <route id="loop_ccw" edges="loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3"/>
-  <vehicle id="veh1" type="cav100" route="loop_cw" depart="0.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh2" type="cav100" route="loop_ccw" depart="0.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh3" type="cav100" route="loop_cw" depart="0.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh4" type="cav100" route="loop_ccw" depart="0.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh5" type="cav100" route="loop_cw" depart="0.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh6" type="cav100" route="loop_ccw" depart="1.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh7" type="cav100" route="loop_cw" depart="1.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh8" type="cav100" route="loop_ccw" depart="1.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh9" type="cav100" route="loop_cw" depart="1.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh10" type="cav100" route="loop_ccw" depart="1.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh11" type="cav100" route="loop_cw" depart="2.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh12" type="cav100" route="loop_ccw" depart="2.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh13" type="cav100" route="loop_cw" depart="2.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh14" type="cav100" route="loop_ccw" depart="2.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh15" type="cav100" route="loop_cw" depart="2.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh16" type="cav100" route="loop_ccw" depart="3.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh17" type="cav100" route="loop_cw" depart="3.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh18" type="cav100" route="loop_ccw" depart="3.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh19" type="cav100" route="loop_cw" depart="3.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh20" type="cav100" route="loop_ccw" depart="3.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh21" type="cav100" route="loop_cw" depart="4.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh22" type="cav100" route="loop_ccw" depart="4.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh23" type="cav100" route="loop_cw" depart="4.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh24" type="cav100" route="loop_ccw" depart="4.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh25" type="cav100" route="loop_cw" depart="4.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh26" type="cav100" route="loop_ccw" depart="5.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh27" type="cav100" route="loop_cw" depart="5.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh28" type="cav100" route="loop_ccw" depart="5.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh29" type="cav100" route="loop_cw" depart="5.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh30" type="cav100" route="loop_ccw" depart="5.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh31" type="cav100" route="loop_cw" depart="6.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh32" type="cav100" route="loop_ccw" depart="6.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh33" type="cav100" route="loop_cw" depart="6.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh34" type="cav100" route="loop_ccw" depart="6.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh35" type="cav100" route="loop_cw" depart="6.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh36" type="cav100" route="loop_ccw" depart="7.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh37" type="cav100" route="loop_cw" depart="7.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh38" type="cav100" route="loop_ccw" depart="7.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh39" type="cav100" route="loop_cw" depart="7.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh40" type="cav100" route="loop_ccw" depart="7.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh41" type="cav100" route="loop_cw" depart="8.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh42" type="cav100" route="loop_ccw" depart="8.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh43" type="cav100" route="loop_cw" depart="8.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh44" type="cav100" route="loop_ccw" depart="8.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh45" type="cav100" route="loop_cw" depart="8.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh46" type="cav100" route="loop_ccw" depart="9.0" departLane="2" departSpeed="max"/>
-  <vehicle id="veh47" type="cav100" route="loop_cw" depart="9.2" departLane="2" departSpeed="max"/>
-  <vehicle id="veh48" type="cav100" route="loop_ccw" depart="9.4" departLane="2" departSpeed="max"/>
-  <vehicle id="veh49" type="cav100" route="loop_cw" depart="9.6" departLane="2" departSpeed="max"/>
-  <vehicle id="veh50" type="cav100" route="loop_ccw" depart="9.8" departLane="2" departSpeed="max"/>
-  <vehicle id="veh51" type="cav100" route="loop_cw" depart="10.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh52" type="cav100" route="loop_ccw" depart="10.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh53" type="cav100" route="loop_cw" depart="10.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh54" type="cav100" route="loop_ccw" depart="10.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh55" type="cav100" route="loop_cw" depart="10.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh56" type="cav100" route="loop_ccw" depart="11.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh57" type="cav100" route="loop_cw" depart="11.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh58" type="cav100" route="loop_ccw" depart="11.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh59" type="cav100" route="loop_cw" depart="11.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh60" type="cav100" route="loop_ccw" depart="11.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh61" type="cav100" route="loop_cw" depart="12.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh62" type="cav100" route="loop_ccw" depart="12.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh63" type="cav100" route="loop_cw" depart="12.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh64" type="cav100" route="loop_ccw" depart="12.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh65" type="cav100" route="loop_cw" depart="12.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh66" type="cav100" route="loop_ccw" depart="13.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh67" type="cav100" route="loop_cw" depart="13.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh68" type="cav100" route="loop_ccw" depart="13.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh69" type="cav100" route="loop_cw" depart="13.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh70" type="cav100" route="loop_ccw" depart="13.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh71" type="cav100" route="loop_cw" depart="14.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh72" type="cav100" route="loop_ccw" depart="14.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh73" type="cav100" route="loop_cw" depart="14.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh74" type="cav100" route="loop_ccw" depart="14.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh75" type="cav100" route="loop_cw" depart="14.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh76" type="cav100" route="loop_ccw" depart="15.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh77" type="cav100" route="loop_cw" depart="15.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh78" type="cav100" route="loop_ccw" depart="15.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh79" type="cav100" route="loop_cw" depart="15.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh80" type="cav100" route="loop_ccw" depart="15.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh81" type="cav100" route="loop_cw" depart="16.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh82" type="cav100" route="loop_ccw" depart="16.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh83" type="cav100" route="loop_cw" depart="16.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh84" type="cav100" route="loop_ccw" depart="16.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh85" type="cav100" route="loop_cw" depart="16.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh86" type="cav100" route="loop_ccw" depart="17.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh87" type="cav100" route="loop_cw" depart="17.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh88" type="cav100" route="loop_ccw" depart="17.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh89" type="cav100" route="loop_cw" depart="17.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh90" type="cav100" route="loop_ccw" depart="17.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh91" type="cav100" route="loop_cw" depart="18.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh92" type="cav100" route="loop_ccw" depart="18.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh93" type="cav100" route="loop_cw" depart="18.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh94" type="cav100" route="loop_ccw" depart="18.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh95" type="cav100" route="loop_cw" depart="18.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh96" type="cav100" route="loop_ccw" depart="19.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh97" type="cav100" route="loop_cw" depart="19.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh98" type="cav100" route="loop_ccw" depart="19.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh99" type="cav100" route="loop_cw" depart="19.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh100" type="cav100" route="loop_ccw" depart="19.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh101" type="human100" route="loop_cw" depart="20.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh102" type="human100" route="loop_ccw" depart="20.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh103" type="human100" route="loop_cw" depart="20.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh104" type="human100" route="loop_ccw" depart="20.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh105" type="human100" route="loop_cw" depart="20.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh106" type="human100" route="loop_ccw" depart="21.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh107" type="human100" route="loop_cw" depart="21.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh108" type="human100" route="loop_ccw" depart="21.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh109" type="human100" route="loop_cw" depart="21.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh110" type="human100" route="loop_ccw" depart="21.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh111" type="human100" route="loop_cw" depart="22.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh112" type="human100" route="loop_ccw" depart="22.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh113" type="human100" route="loop_cw" depart="22.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh114" type="human100" route="loop_ccw" depart="22.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh115" type="human100" route="loop_cw" depart="22.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh116" type="human100" route="loop_ccw" depart="23.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh117" type="human100" route="loop_cw" depart="23.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh118" type="human100" route="loop_ccw" depart="23.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh119" type="human100" route="loop_cw" depart="23.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh120" type="human100" route="loop_ccw" depart="23.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh121" type="human100" route="loop_cw" depart="24.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh122" type="human100" route="loop_ccw" depart="24.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh123" type="human100" route="loop_cw" depart="24.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh124" type="human100" route="loop_ccw" depart="24.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh125" type="human100" route="loop_cw" depart="24.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh126" type="human100" route="loop_ccw" depart="25.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh127" type="human100" route="loop_cw" depart="25.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh128" type="human100" route="loop_ccw" depart="25.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh129" type="human100" route="loop_cw" depart="25.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh130" type="human100" route="loop_ccw" depart="25.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh131" type="human100" route="loop_cw" depart="26.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh132" type="human100" route="loop_ccw" depart="26.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh133" type="human100" route="loop_cw" depart="26.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh134" type="human100" route="loop_ccw" depart="26.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh135" type="human100" route="loop_cw" depart="26.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh136" type="human100" route="loop_ccw" depart="27.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh137" type="human100" route="loop_cw" depart="27.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh138" type="human100" route="loop_ccw" depart="27.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh139" type="human100" route="loop_cw" depart="27.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh140" type="human100" route="loop_ccw" depart="27.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh141" type="human100" route="loop_cw" depart="28.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh142" type="human100" route="loop_ccw" depart="28.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh143" type="human100" route="loop_cw" depart="28.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh144" type="human100" route="loop_ccw" depart="28.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh145" type="human100" route="loop_cw" depart="28.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh146" type="human100" route="loop_ccw" depart="29.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh147" type="human100" route="loop_cw" depart="29.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh148" type="human100" route="loop_ccw" depart="29.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh149" type="human100" route="loop_cw" depart="29.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh150" type="human100" route="loop_ccw" depart="29.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh151" type="human100" route="loop_cw" depart="30.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh152" type="human100" route="loop_ccw" depart="30.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh153" type="human100" route="loop_cw" depart="30.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh154" type="human100" route="loop_ccw" depart="30.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh155" type="human100" route="loop_cw" depart="30.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh156" type="human100" route="loop_ccw" depart="31.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh157" type="human100" route="loop_cw" depart="31.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh158" type="human100" route="loop_ccw" depart="31.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh159" type="human100" route="loop_cw" depart="31.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh160" type="human100" route="loop_ccw" depart="31.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh161" type="human100" route="loop_cw" depart="32.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh162" type="human100" route="loop_ccw" depart="32.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh163" type="human100" route="loop_cw" depart="32.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh164" type="human100" route="loop_ccw" depart="32.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh165" type="human100" route="loop_cw" depart="32.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh166" type="human100" route="loop_ccw" depart="33.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh167" type="human100" route="loop_cw" depart="33.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh168" type="human100" route="loop_ccw" depart="33.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh169" type="human100" route="loop_cw" depart="33.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh170" type="human100" route="loop_ccw" depart="33.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh171" type="human100" route="loop_cw" depart="34.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh172" type="human100" route="loop_ccw" depart="34.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh173" type="human100" route="loop_cw" depart="34.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh174" type="human100" route="loop_ccw" depart="34.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh175" type="human100" route="loop_cw" depart="34.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh176" type="human100" route="loop_ccw" depart="35.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh177" type="human100" route="loop_cw" depart="35.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh178" type="human100" route="loop_ccw" depart="35.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh179" type="human100" route="loop_cw" depart="35.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh180" type="human100" route="loop_ccw" depart="35.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh181" type="human100" route="loop_cw" depart="36.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh182" type="human100" route="loop_ccw" depart="36.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh183" type="human100" route="loop_cw" depart="36.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh184" type="human100" route="loop_ccw" depart="36.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh185" type="human100" route="loop_cw" depart="36.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh186" type="human100" route="loop_ccw" depart="37.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh187" type="human100" route="loop_cw" depart="37.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh188" type="human100" route="loop_ccw" depart="37.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh189" type="human100" route="loop_cw" depart="37.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh190" type="human100" route="loop_ccw" depart="37.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh191" type="human100" route="loop_cw" depart="38.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh192" type="human100" route="loop_ccw" depart="38.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh193" type="human100" route="loop_cw" depart="38.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh194" type="human100" route="loop_ccw" depart="38.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh195" type="human100" route="loop_cw" depart="38.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh196" type="human100" route="loop_ccw" depart="39.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh197" type="human100" route="loop_cw" depart="39.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh198" type="human100" route="loop_ccw" depart="39.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh199" type="human100" route="loop_cw" depart="39.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh200" type="human100" route="loop_ccw" depart="39.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh201" type="human100" route="loop_cw" depart="40.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh202" type="human100" route="loop_ccw" depart="40.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh203" type="human100" route="loop_cw" depart="40.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh204" type="human100" route="loop_ccw" depart="40.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh205" type="human100" route="loop_cw" depart="40.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh206" type="human100" route="loop_ccw" depart="41.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh207" type="human100" route="loop_cw" depart="41.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh208" type="human100" route="loop_ccw" depart="41.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh209" type="human100" route="loop_cw" depart="41.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh210" type="human100" route="loop_ccw" depart="41.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh211" type="human100" route="loop_cw" depart="42.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh212" type="human100" route="loop_ccw" depart="42.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh213" type="human100" route="loop_cw" depart="42.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh214" type="human100" route="loop_ccw" depart="42.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh215" type="human100" route="loop_cw" depart="42.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh216" type="human100" route="loop_ccw" depart="43.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh217" type="human100" route="loop_cw" depart="43.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh218" type="human100" route="loop_ccw" depart="43.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh219" type="human100" route="loop_cw" depart="43.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh220" type="human100" route="loop_ccw" depart="43.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh221" type="human100" route="loop_cw" depart="44.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh222" type="human100" route="loop_ccw" depart="44.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh223" type="human100" route="loop_cw" depart="44.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh224" type="human100" route="loop_ccw" depart="44.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh225" type="human100" route="loop_cw" depart="44.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh226" type="human100" route="loop_ccw" depart="45.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh227" type="human100" route="loop_cw" depart="45.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh228" type="human100" route="loop_ccw" depart="45.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh229" type="human100" route="loop_cw" depart="45.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh230" type="human100" route="loop_ccw" depart="45.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh231" type="human100" route="loop_cw" depart="46.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh232" type="human100" route="loop_ccw" depart="46.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh233" type="human100" route="loop_cw" depart="46.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh234" type="human100" route="loop_ccw" depart="46.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh235" type="human100" route="loop_cw" depart="46.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh236" type="human100" route="loop_ccw" depart="47.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh237" type="human100" route="loop_cw" depart="47.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh238" type="human100" route="loop_ccw" depart="47.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh239" type="human100" route="loop_cw" depart="47.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh240" type="human100" route="loop_ccw" depart="47.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh241" type="human100" route="loop_cw" depart="48.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh242" type="human100" route="loop_ccw" depart="48.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh243" type="human100" route="loop_cw" depart="48.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh244" type="human100" route="loop_ccw" depart="48.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh245" type="human100" route="loop_cw" depart="48.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh246" type="human100" route="loop_ccw" depart="49.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh247" type="human100" route="loop_cw" depart="49.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh248" type="human100" route="loop_ccw" depart="49.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh249" type="human100" route="loop_cw" depart="49.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh250" type="human100" route="loop_ccw" depart="49.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh251" type="human100" route="loop_cw" depart="50.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh252" type="human100" route="loop_ccw" depart="50.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh253" type="human100" route="loop_cw" depart="50.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh254" type="human100" route="loop_ccw" depart="50.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh255" type="human100" route="loop_cw" depart="50.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh256" type="human100" route="loop_ccw" depart="51.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh257" type="human100" route="loop_cw" depart="51.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh258" type="human100" route="loop_ccw" depart="51.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh259" type="human100" route="loop_cw" depart="51.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh260" type="human100" route="loop_ccw" depart="51.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh261" type="human100" route="loop_cw" depart="52.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh262" type="human100" route="loop_ccw" depart="52.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh263" type="human100" route="loop_cw" depart="52.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh264" type="human100" route="loop_ccw" depart="52.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh265" type="human100" route="loop_cw" depart="52.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh266" type="human100" route="loop_ccw" depart="53.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh267" type="human100" route="loop_cw" depart="53.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh268" type="human100" route="loop_ccw" depart="53.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh269" type="human100" route="loop_cw" depart="53.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh270" type="human100" route="loop_ccw" depart="53.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh271" type="human100" route="loop_cw" depart="54.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh272" type="human100" route="loop_ccw" depart="54.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh273" type="human100" route="loop_cw" depart="54.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh274" type="human100" route="loop_ccw" depart="54.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh275" type="human100" route="loop_cw" depart="54.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh276" type="human100" route="loop_ccw" depart="55.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh277" type="human100" route="loop_cw" depart="55.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh278" type="human100" route="loop_ccw" depart="55.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh279" type="human100" route="loop_cw" depart="55.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh280" type="human100" route="loop_ccw" depart="55.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh281" type="human100" route="loop_cw" depart="56.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh282" type="human100" route="loop_ccw" depart="56.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh283" type="human100" route="loop_cw" depart="56.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh284" type="human100" route="loop_ccw" depart="56.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh285" type="human100" route="loop_cw" depart="56.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh286" type="human100" route="loop_ccw" depart="57.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh287" type="human100" route="loop_cw" depart="57.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh288" type="human100" route="loop_ccw" depart="57.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh289" type="human100" route="loop_cw" depart="57.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh290" type="human100" route="loop_ccw" depart="57.8" departLane="0" departSpeed="max"/>
-  <vehicle id="veh291" type="human100" route="loop_cw" depart="58.0" departLane="1" departSpeed="max"/>
-  <vehicle id="veh292" type="human100" route="loop_ccw" depart="58.2" departLane="0" departSpeed="max"/>
-  <vehicle id="veh293" type="human100" route="loop_cw" depart="58.4" departLane="1" departSpeed="max"/>
-  <vehicle id="veh294" type="human100" route="loop_ccw" depart="58.6" departLane="0" departSpeed="max"/>
-  <vehicle id="veh295" type="human100" route="loop_cw" depart="58.8" departLane="1" departSpeed="max"/>
-  <vehicle id="veh296" type="human100" route="loop_ccw" depart="59.0" departLane="0" departSpeed="max"/>
-  <vehicle id="veh297" type="human100" route="loop_cw" depart="59.2" departLane="1" departSpeed="max"/>
-  <vehicle id="veh298" type="human100" route="loop_ccw" depart="59.4" departLane="0" departSpeed="max"/>
-  <vehicle id="veh299" type="human100" route="loop_cw" depart="59.6" departLane="1" departSpeed="max"/>
-  <vehicle id="veh300" type="human100" route="loop_ccw" depart="59.8" departLane="0" departSpeed="max"/>
+  <vType id="noncav100" accel="2.6" decel="4.5" sigma="0.5" length="5" maxSpeed="27.78" color="150,150,150"/>
+  <route id="loop_cw_0" edges="loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3"/>
+  <route id="loop_cw_1" edges="loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0"/>
+  <route id="loop_cw_2" edges="loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1"/>
+  <route id="loop_cw_3" edges="loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2 loop_3 loop_0 loop_1 loop_2"/>
+  <route id="loop_ccw_0" edges="loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3"/>
+  <route id="loop_ccw_1" edges="loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2"/>
+  <route id="loop_ccw_2" edges="loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1"/>
+  <route id="loop_ccw_3" edges="loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0 loop_r3 loop_r2 loop_r1 loop_r0"/>
+  <vehicle id="veh21" type="cav100" route="loop_cw_2" depart="0.0" departLane="2" departPos="464.8" departSpeed="max"/>
+  <vehicle id="veh24" type="cav100" route="loop_cw_0" depart="0.0" departLane="2" departPos="464.8" departSpeed="max"/>
+  <vehicle id="veh18" type="cav100" route="loop_cw_0" depart="0.1" departLane="2" departPos="85.4" departSpeed="max"/>
+  <vehicle id="veh35" type="cav100" route="loop_cw_3" depart="0.1" departLane="2" departPos="38.9" departSpeed="max"/>
+  <vehicle id="veh64" type="cav100" route="loop_cw_0" depart="0.1" departLane="2" departPos="285.0" departSpeed="max"/>
+  <vehicle id="veh75" type="cav100" route="loop_cw_2" depart="0.1" departLane="0" departPos="185.9" departSpeed="max"/>
+  <vehicle id="veh12" type="cav100" route="loop_cw_0" depart="0.2" departLane="1" departPos="385.3" departSpeed="max"/>
+  <vehicle id="veh15" type="cav100" route="loop_ccw_1" depart="0.2" departLane="2" departPos="382.0" departSpeed="max"/>
+  <vehicle id="veh45" type="cav100" route="loop_cw_3" depart="0.2" departLane="2" departPos="334.5" departSpeed="max"/>
+  <vehicle id="veh59" type="cav100" route="loop_cw_3" depart="0.2" departLane="2" departPos="133.7" departSpeed="max"/>
+  <vehicle id="veh60" type="cav100" route="loop_ccw_1" depart="0.2" departLane="2" departPos="138.0" departSpeed="max"/>
+  <vehicle id="veh63" type="cav100" route="loop_cw_3" depart="0.2" departLane="2" departPos="233.1" departSpeed="max"/>
+  <vehicle id="veh67" type="cav100" route="loop_ccw_0" depart="0.2" departLane="2" departPos="432.8" departSpeed="max"/>
+  <vehicle id="veh6" type="cav100" route="loop_cw_0" depart="0.3" departLane="2" departPos="331.4" departSpeed="max"/>
+  <vehicle id="veh46" type="cav100" route="loop_ccw_0" depart="0.3" departLane="2" departPos="334.2" departSpeed="max"/>
+  <vehicle id="veh66" type="cav100" route="loop_ccw_3" depart="0.3" departLane="2" departPos="81.2" departSpeed="max"/>
+  <vehicle id="veh31" type="cav100" route="loop_ccw_2" depart="0.4" departLane="1" departPos="131.7" departSpeed="max"/>
+  <vehicle id="veh39" type="cav100" route="loop_cw_1" depart="0.4" departLane="2" departPos="84.5" departSpeed="max"/>
+  <vehicle id="veh56" type="cav100" route="loop_ccw_3" depart="0.4" departLane="2" departPos="133.2" departSpeed="max"/>
+  <vehicle id="veh80" type="cav100" route="loop_cw_0" depart="0.4" departLane="2" departPos="136.3" departSpeed="max"/>
+  <vehicle id="veh28" type="cav100" route="loop_cw_3" depart="0.5" departLane="1" departPos="386.5" departSpeed="max"/>
+  <vehicle id="veh77" type="cav100" route="loop_cw_2" depart="0.5" departLane="2" departPos="134.9" departSpeed="max"/>
+  <vehicle id="veh79" type="cav100" route="loop_cw_1" depart="0.5" departLane="2" departPos="137.9" departSpeed="max"/>
+  <vehicle id="veh167" type="noncav100" route="loop_ccw_1" depart="0.5" departLane="0" departPos="54.7" departSpeed="max"/>
+  <vehicle id="veh173" type="noncav100" route="loop_cw_1" depart="0.5" departLane="0" departPos="117.7" departSpeed="max"/>
+  <vehicle id="veh4" type="cav100" route="loop_cw_2" depart="0.6" departLane="1" departPos="386.2" departSpeed="max"/>
+  <vehicle id="veh9" type="cav100" route="loop_ccw_1" depart="0.6" departLane="2" departPos="231.9" departSpeed="max"/>
+  <vehicle id="veh47" type="cav100" route="loop_ccw_0" depart="0.6" departLane="2" departPos="134.8" departSpeed="max"/>
+  <vehicle id="veh57" type="cav100" route="loop_ccw_2" depart="0.6" departLane="1" departPos="464.8" departSpeed="max"/>
+  <vehicle id="veh118" type="noncav100" route="loop_cw_3" depart="0.6" departLane="0" departPos="319.2" departSpeed="max"/>
+  <vehicle id="veh162" type="noncav100" route="loop_ccw_0" depart="0.6" departLane="0" departPos="111.7" departSpeed="max"/>
+  <vehicle id="veh166" type="noncav100" route="loop_cw_3" depart="0.6" departLane="0" departPos="377.6" departSpeed="max"/>
+  <vehicle id="veh181" type="noncav100" route="loop_cw_1" depart="0.6" departLane="1" departPos="53.1" departSpeed="max"/>
+  <vehicle id="veh44" type="cav100" route="loop_cw_1" depart="0.7" departLane="2" departPos="234.7" departSpeed="max"/>
+  <vehicle id="veh145" type="noncav100" route="loop_ccw_2" depart="0.7" departLane="0" departPos="246.3" departSpeed="max"/>
+  <vehicle id="veh157" type="noncav100" route="loop_ccw_3" depart="0.7" departLane="1" departPos="118.4" departSpeed="max"/>
+  <vehicle id="veh23" type="cav100" route="loop_cw_2" depart="0.8" departLane="2" departPos="284.6" departSpeed="max"/>
+  <vehicle id="veh30" type="cav100" route="loop_cw_0" depart="0.8" departLane="0" departPos="431.7" departSpeed="max"/>
+  <vehicle id="veh55" type="cav100" route="loop_ccw_2" depart="0.8" departLane="1" departPos="285.5" departSpeed="max"/>
+  <vehicle id="veh58" type="cav100" route="loop_ccw_1" depart="0.8" departLane="2" departPos="87.7" departSpeed="max"/>
+  <vehicle id="veh70" type="cav100" route="loop_cw_3" depart="0.8" departLane="1" departPos="436.1" departSpeed="max"/>
+  <vehicle id="veh123" type="noncav100" route="loop_cw_1" depart="0.8" departLane="0" departPos="172.0" departSpeed="max"/>
+  <vehicle id="veh14" type="cav100" route="loop_cw_2" depart="0.9" departLane="2" departPos="431.1" departSpeed="max"/>
+  <vehicle id="veh102" type="noncav100" route="loop_cw_2" depart="0.9" departLane="1" departPos="111.5" departSpeed="max"/>
+  <vehicle id="veh160" type="noncav100" route="loop_cw_0" depart="0.9" departLane="0" departPos="444.0" departSpeed="max"/>
+  <vehicle id="veh180" type="noncav100" route="loop_ccw_3" depart="0.9" departLane="1" departPos="314.3" departSpeed="max"/>
+  <vehicle id="veh3" type="cav100" route="loop_ccw_2" depart="1.0" departLane="2" departPos="32.0" departSpeed="max"/>
+  <vehicle id="veh7" type="cav100" route="loop_cw_1" depart="1.0" departLane="2" departPos="384.8" departSpeed="max"/>
+  <vehicle id="veh17" type="cav100" route="loop_ccw_1" depart="1.0" departLane="1" departPos="464.8" departSpeed="max"/>
+  <vehicle id="veh22" type="cav100" route="loop_ccw_0" depart="1.0" departLane="2" departPos="464.2" departSpeed="max"/>
+  <vehicle id="veh52" type="cav100" route="loop_ccw_3" depart="1.0" departLane="2" departPos="384.9" departSpeed="max"/>
+  <vehicle id="veh72" type="cav100" route="loop_ccw_3" depart="1.0" departLane="2" departPos="282.4" departSpeed="max"/>
+  <vehicle id="veh89" type="noncav100" route="loop_cw_3" depart="1.0" departLane="1" departPos="113.6" departSpeed="max"/>
+  <vehicle id="veh137" type="noncav100" route="loop_cw_3" depart="1.0" departLane="1" departPos="440.0" departSpeed="max"/>
+  <vehicle id="veh156" type="noncav100" route="loop_cw_2" depart="1.0" departLane="0" departPos="442.5" departSpeed="max"/>
+  <vehicle id="veh37" type="cav100" route="loop_cw_0" depart="1.1" departLane="2" departPos="234.7" departSpeed="max"/>
+  <vehicle id="veh49" type="cav100" route="loop_ccw_1" depart="1.1" departLane="1" departPos="336.5" departSpeed="max"/>
+  <vehicle id="veh121" type="noncav100" route="loop_ccw_0" depart="1.1" departLane="0" departPos="317.3" departSpeed="max"/>
+  <vehicle id="veh140" type="noncav100" route="loop_ccw_1" depart="1.1" departLane="1" departPos="117.6" departSpeed="max"/>
+  <vehicle id="veh19" type="cav100" route="loop_cw_3" depart="1.2" departLane="0" departPos="282.3" departSpeed="max"/>
+  <vehicle id="veh33" type="cav100" route="loop_ccw_1" depart="1.2" departLane="2" departPos="187.4" departSpeed="max"/>
+  <vehicle id="veh36" type="cav100" route="loop_cw_3" depart="1.2" departLane="2" departPos="185.3" departSpeed="max"/>
+  <vehicle id="veh50" type="cav100" route="loop_cw_1" depart="1.2" departLane="1" departPos="38.0" departSpeed="max"/>
+  <vehicle id="veh73" type="cav100" route="loop_cw_1" depart="1.2" departLane="2" departPos="185.7" departSpeed="max"/>
+  <vehicle id="veh94" type="noncav100" route="loop_cw_0" depart="1.2" departLane="1" departPos="310.9" departSpeed="max"/>
+  <vehicle id="veh151" type="noncav100" route="loop_ccw_1" depart="1.2" departLane="0" departPos="241.1" departSpeed="max"/>
+  <vehicle id="veh194" type="noncav100" route="loop_ccw_0" depart="1.2" departLane="1" departPos="370.1" departSpeed="max"/>
+  <vehicle id="veh5" type="cav100" route="loop_ccw_2" depart="1.3" departLane="2" departPos="433.0" departSpeed="max"/>
+  <vehicle id="veh29" type="cav100" route="loop_cw_2" depart="1.3" departLane="2" departPos="336.2" departSpeed="max"/>
+  <vehicle id="veh78" type="cav100" route="loop_cw_1" depart="1.3" departLane="2" departPos="286.7" departSpeed="max"/>
+  <vehicle id="veh115" type="noncav100" route="loop_cw_0" depart="1.3" departLane="0" departPos="375.9" departSpeed="max"/>
+  <vehicle id="veh143" type="noncav100" route="loop_ccw_0" depart="1.3" departLane="1" departPos="240.8" departSpeed="max"/>
+  <vehicle id="veh147" type="noncav100" route="loop_ccw_1" depart="1.3" departLane="1" departPos="370.9" departSpeed="max"/>
+  <vehicle id="veh40" type="cav100" route="loop_ccw_2" depart="1.4" departLane="0" departPos="82.9" departSpeed="max"/>
+  <vehicle id="veh54" type="cav100" route="loop_cw_3" depart="1.4" departLane="2" departPos="86.1" departSpeed="max"/>
+  <vehicle id="veh88" type="noncav100" route="loop_cw_1" depart="1.4" departLane="0" departPos="53.1" departSpeed="max"/>
+  <vehicle id="veh176" type="noncav100" route="loop_ccw_1" depart="1.4" departLane="1" departPos="241.9" departSpeed="max"/>
+  <vehicle id="veh20" type="cav100" route="loop_ccw_3" depart="1.5" departLane="2" departPos="185.6" departSpeed="max"/>
+  <vehicle id="veh48" type="cav100" route="loop_cw_1" depart="1.5" departLane="2" departPos="436.3" departSpeed="max"/>
+  <vehicle id="veh71" type="cav100" route="loop_ccw_0" depart="1.5" departLane="2" departPos="86.0" departSpeed="max"/>
+  <vehicle id="veh83" type="noncav100" route="loop_cw_3" depart="1.5" departLane="1" departPos="179.1" departSpeed="max"/>
+  <vehicle id="veh100" type="noncav100" route="loop_cw_2" depart="1.5" departLane="1" departPos="245.4" departSpeed="max"/>
+  <vehicle id="veh120" type="noncav100" route="loop_cw_0" depart="1.5" departLane="1" departPos="56.0" departSpeed="max"/>
+  <vehicle id="veh8" type="cav100" route="loop_ccw_0" depart="1.6" departLane="2" departPos="283.0" departSpeed="max"/>
+  <vehicle id="veh10" type="cav100" route="loop_cw_1" depart="1.6" departLane="2" departPos="464.8" departSpeed="max"/>
+  <vehicle id="veh13" type="cav100" route="loop_ccw_0" depart="1.6" departLane="2" departPos="32.2" departSpeed="max"/>
+  <vehicle id="veh16" type="cav100" route="loop_ccw_0" depart="1.6" departLane="2" departPos="387.8" departSpeed="max"/>
+  <vehicle id="veh26" type="cav100" route="loop_ccw_1" depart="1.6" departLane="2" departPos="282.3" departSpeed="max"/>
+  <vehicle id="veh27" type="cav100" route="loop_cw_0" depart="1.6" departLane="2" departPos="183.2" departSpeed="max"/>
+  <vehicle id="veh41" type="cav100" route="loop_ccw_3" depart="1.6" departLane="2" departPos="335.8" departSpeed="max"/>
+  <vehicle id="veh74" type="cav100" route="loop_ccw_1" depart="1.6" departLane="2" departPos="32.6" departSpeed="max"/>
+  <vehicle id="veh90" type="noncav100" route="loop_ccw_2" depart="1.6" departLane="1" departPos="246.8" departSpeed="max"/>
+  <vehicle id="veh169" type="noncav100" route="loop_cw_2" depart="1.6" departLane="0" departPos="52.8" departSpeed="max"/>
+  <vehicle id="veh191" type="noncav100" route="loop_cw_3" depart="1.6" departLane="1" departPos="244.9" departSpeed="max"/>
+  <vehicle id="veh38" type="cav100" route="loop_ccw_3" depart="1.7" departLane="2" departPos="464.8" departSpeed="max"/>
+  <vehicle id="veh43" type="cav100" route="loop_cw_2" depart="1.7" departLane="2" departPos="37.7" departSpeed="max"/>
+  <vehicle id="veh53" type="cav100" route="loop_ccw_3" depart="1.7" departLane="2" departPos="33.6" departSpeed="max"/>
+  <vehicle id="veh62" type="cav100" route="loop_ccw_2" depart="1.7" departLane="1" departPos="238.3" departSpeed="max"/>
+  <vehicle id="veh68" type="cav100" route="loop_ccw_3" depart="1.7" departLane="0" departPos="233.3" departSpeed="max"/>
+  <vehicle id="veh107" type="noncav100" route="loop_cw_2" depart="1.7" departLane="1" departPos="316.2" departSpeed="max"/>
+  <vehicle id="veh161" type="noncav100" route="loop_ccw_1" depart="1.7" departLane="1" departPos="51.3" departSpeed="max"/>
+  <vehicle id="veh2" type="cav100" route="loop_cw_1" depart="1.8" departLane="2" departPos="337.7" departSpeed="max"/>
+  <vehicle id="veh25" type="cav100" route="loop_ccw_1" depart="1.8" departLane="2" departPos="434.5" departSpeed="max"/>
+  <vehicle id="veh34" type="cav100" route="loop_ccw_0" depart="1.8" departLane="2" departPos="183.0" departSpeed="max"/>
+  <vehicle id="veh42" type="cav100" route="loop_cw_2" depart="1.8" departLane="2" departPos="234.9" departSpeed="max"/>
+  <vehicle id="veh1" type="cav100" route="loop_ccw_0" depart="1.9" departLane="2" departPos="237.8" departSpeed="max"/>
+  <vehicle id="veh32" type="cav100" route="loop_cw_0" depart="1.9" departLane="0" departPos="37.6" departSpeed="max"/>
+  <vehicle id="veh51" type="cav100" route="loop_cw_3" depart="1.9" departLane="2" departPos="464.8" departSpeed="max"/>
+  <vehicle id="veh61" type="cav100" route="loop_cw_2" depart="1.9" departLane="2" departPos="83.1" departSpeed="max"/>
+  <vehicle id="veh69" type="cav100" route="loop_ccw_2" depart="1.9" departLane="1" departPos="184.9" departSpeed="max"/>
+  <vehicle id="veh76" type="cav100" route="loop_ccw_2" depart="1.9" departLane="2" departPos="338.1" departSpeed="max"/>
+  <vehicle id="veh108" type="noncav100" route="loop_ccw_2" depart="1.9" departLane="0" departPos="443.6" departSpeed="max"/>
+  <vehicle id="veh139" type="noncav100" route="loop_ccw_3" depart="1.9" departLane="0" departPos="59.3" departSpeed="max"/>
+  <vehicle id="veh11" type="cav100" route="loop_ccw_3" depart="2.0" departLane="2" departPos="431.8" departSpeed="max"/>
+  <vehicle id="veh65" type="cav100" route="loop_ccw_2" depart="2.0" departLane="2" departPos="388.0" departSpeed="max"/>
+  <vehicle id="veh116" type="noncav100" route="loop_ccw_3" depart="2.0" departLane="1" departPos="51.6" departSpeed="max"/>
+  <vehicle id="veh125" type="noncav100" route="loop_ccw_3" depart="2.0" departLane="0" departPos="174.9" departSpeed="max"/>
+  <vehicle id="veh179" type="noncav100" route="loop_ccw_3" depart="2.0" departLane="1" departPos="175.7" departSpeed="max"/>
+  <vehicle id="veh105" type="noncav100" route="loop_ccw_1" depart="2.1" departLane="0" departPos="310.4" departSpeed="max"/>
+  <vehicle id="veh155" type="noncav100" route="loop_ccw_0" depart="2.1" departLane="1" departPos="115.7" departSpeed="max"/>
+  <vehicle id="veh159" type="noncav100" route="loop_ccw_2" depart="2.1" departLane="1" departPos="377.4" departSpeed="max"/>
+  <vehicle id="veh98" type="noncav100" route="loop_cw_0" depart="2.2" departLane="0" departPos="173.5" departSpeed="max"/>
+  <vehicle id="veh134" type="noncav100" route="loop_ccw_1" depart="2.2" departLane="0" departPos="114.0" departSpeed="max"/>
+  <vehicle id="veh154" type="noncav100" route="loop_ccw_1" depart="2.2" departLane="1" departPos="313.0" departSpeed="max"/>
+  <vehicle id="veh82" type="noncav100" route="loop_ccw_0" depart="2.3" departLane="1" departPos="370.1" departSpeed="max"/>
+  <vehicle id="veh128" type="noncav100" route="loop_cw_2" depart="2.3" departLane="1" departPos="50.6" departSpeed="max"/>
+  <vehicle id="veh148" type="noncav100" route="loop_cw_3" depart="2.3" departLane="0" departPos="442.7" departSpeed="max"/>
+  <vehicle id="veh165" type="noncav100" route="loop_ccw_2" depart="2.4" departLane="0" departPos="316.3" departSpeed="max"/>
+  <vehicle id="veh187" type="noncav100" route="loop_cw_1" depart="2.4" departLane="1" departPos="318.5" departSpeed="max"/>
+  <vehicle id="veh197" type="noncav100" route="loop_cw_0" depart="2.4" departLane="0" departPos="110.5" departSpeed="max"/>
+  <vehicle id="veh144" type="noncav100" route="loop_ccw_2" depart="2.5" departLane="1" departPos="443.7" departSpeed="max"/>
+  <vehicle id="veh193" type="noncav100" route="loop_cw_1" depart="2.5" departLane="0" departPos="440.9" departSpeed="max"/>
+  <vehicle id="veh96" type="noncav100" route="loop_cw_3" depart="2.6" departLane="1" departPos="54.5" departSpeed="max"/>
+  <vehicle id="veh114" type="noncav100" route="loop_cw_2" depart="2.6" departLane="0" departPos="310.8" departSpeed="max"/>
+  <vehicle id="veh178" type="noncav100" route="loop_cw_1" depart="2.6" departLane="0" departPos="249.4" departSpeed="max"/>
+  <vehicle id="veh184" type="noncav100" route="loop_cw_0" depart="2.6" departLane="0" departPos="245.7" departSpeed="max"/>
+  <vehicle id="veh186" type="noncav100" route="loop_ccw_3" depart="2.6" departLane="1" departPos="249.0" departSpeed="max"/>
+  <vehicle id="veh109" type="noncav100" route="loop_ccw_3" depart="2.7" departLane="0" departPos="441.5" departSpeed="max"/>
+  <vehicle id="veh111" type="noncav100" route="loop_ccw_2" depart="2.7" departLane="0" departPos="56.8" departSpeed="max"/>
+  <vehicle id="veh136" type="noncav100" route="loop_cw_3" depart="2.7" departLane="0" departPos="118.2" departSpeed="max"/>
+  <vehicle id="veh171" type="noncav100" route="loop_ccw_1" depart="2.7" departLane="1" departPos="173.1" departSpeed="max"/>
+  <vehicle id="veh192" type="noncav100" route="loop_cw_0" depart="2.7" departLane="0" departPos="52.4" departSpeed="max"/>
+  <vehicle id="veh150" type="noncav100" route="loop_cw_1" depart="2.8" departLane="1" departPos="449.3" departSpeed="max"/>
+  <vehicle id="veh93" type="noncav100" route="loop_ccw_2" depart="2.9" departLane="1" departPos="118.0" departSpeed="max"/>
+  <vehicle id="veh104" type="noncav100" route="loop_ccw_0" depart="2.9" departLane="0" departPos="54.4" departSpeed="max"/>
+  <vehicle id="veh177" type="noncav100" route="loop_cw_1" depart="2.9" departLane="1" departPos="379.6" departSpeed="max"/>
+  <vehicle id="veh127" type="noncav100" route="loop_ccw_0" depart="3.0" departLane="1" departPos="174.5" departSpeed="max"/>
+  <vehicle id="veh170" type="noncav100" route="loop_ccw_0" depart="3.0" departLane="0" departPos="373.1" departSpeed="max"/>
+  <vehicle id="veh92" type="noncav100" route="loop_cw_1" depart="3.1" departLane="1" departPos="246.6" departSpeed="max"/>
+  <vehicle id="veh182" type="noncav100" route="loop_cw_0" depart="3.1" departLane="1" departPos="240.7" departSpeed="max"/>
+  <vehicle id="veh200" type="noncav100" route="loop_cw_1" depart="3.1" departLane="0" departPos="53.1" departSpeed="max"/>
+  <vehicle id="veh119" type="noncav100" route="loop_cw_0" depart="3.2" departLane="1" departPos="175.0" departSpeed="max"/>
+  <vehicle id="veh129" type="noncav100" route="loop_ccw_0" depart="3.2" departLane="0" departPos="244.2" departSpeed="max"/>
+  <vehicle id="veh164" type="noncav100" route="loop_ccw_1" depart="3.2" departLane="1" departPos="444.5" departSpeed="max"/>
+  <vehicle id="veh199" type="noncav100" route="loop_ccw_0" depart="3.3" departLane="0" departPos="172.1" departSpeed="max"/>
+  <vehicle id="veh85" type="noncav100" route="loop_cw_0" depart="3.4" departLane="0" departPos="110.5" departSpeed="max"/>
+  <vehicle id="veh87" type="noncav100" route="loop_ccw_0" depart="3.4" departLane="0" departPos="172.1" departSpeed="max"/>
+  <vehicle id="veh163" type="noncav100" route="loop_cw_2" depart="3.4" departLane="1" departPos="179.0" departSpeed="max"/>
+  <vehicle id="veh175" type="noncav100" route="loop_ccw_3" depart="3.4" departLane="0" departPos="377.2" departSpeed="max"/>
+  <vehicle id="veh188" type="noncav100" route="loop_cw_1" depart="3.4" departLane="0" departPos="379.3" departSpeed="max"/>
+  <vehicle id="veh190" type="noncav100" route="loop_ccw_2" depart="3.4" departLane="0" departPos="119.6" departSpeed="max"/>
+  <vehicle id="veh86" type="noncav100" route="loop_cw_0" depart="3.5" departLane="0" departPos="317.6" departSpeed="max"/>
+  <vehicle id="veh101" type="noncav100" route="loop_cw_3" depart="3.5" departLane="1" departPos="315.4" departSpeed="max"/>
+  <vehicle id="veh110" type="noncav100" route="loop_cw_1" depart="3.5" departLane="1" departPos="174.1" departSpeed="max"/>
+  <vehicle id="veh168" type="noncav100" route="loop_ccw_0" depart="3.5" departLane="0" departPos="443.2" departSpeed="max"/>
+  <vehicle id="veh174" type="noncav100" route="loop_cw_3" depart="3.5" departLane="0" departPos="52.7" departSpeed="max"/>
+  <vehicle id="veh97" type="noncav100" route="loop_ccw_2" depart="3.6" departLane="0" departPos="374.6" departSpeed="max"/>
+  <vehicle id="veh141" type="noncav100" route="loop_cw_3" depart="3.6" departLane="1" departPos="372.3" departSpeed="max"/>
+  <vehicle id="veh117" type="noncav100" route="loop_cw_0" depart="3.7" departLane="1" departPos="113.7" departSpeed="max"/>
+  <vehicle id="veh113" type="noncav100" route="loop_ccw_0" depart="3.8" departLane="1" departPos="51.9" departSpeed="max"/>
+  <vehicle id="veh133" type="noncav100" route="loop_cw_2" depart="3.8" departLane="1" departPos="376.4" departSpeed="max"/>
+  <vehicle id="veh185" type="noncav100" route="loop_cw_2" depart="3.8" departLane="1" departPos="442.2" departSpeed="max"/>
+  <vehicle id="veh124" type="noncav100" route="loop_ccw_3" depart="3.9" departLane="0" departPos="112.4" departSpeed="max"/>
+  <vehicle id="veh130" type="noncav100" route="loop_cw_0" depart="3.9" departLane="1" departPos="448.5" departSpeed="max"/>
+  <vehicle id="veh149" type="noncav100" route="loop_cw_0" depart="3.9" departLane="1" departPos="375.8" departSpeed="max"/>
+  <vehicle id="veh183" type="noncav100" route="loop_cw_1" depart="3.9" departLane="0" departPos="316.2" departSpeed="max"/>
+  <vehicle id="veh196" type="noncav100" route="loop_cw_3" depart="3.9" departLane="0" departPos="246.2" departSpeed="max"/>
+  <vehicle id="veh84" type="noncav100" route="loop_cw_3" depart="4.0" departLane="0" departPos="246.2" departSpeed="max"/>
+  <vehicle id="veh122" type="noncav100" route="loop_ccw_1" depart="4.0" departLane="0" departPos="449.1" departSpeed="max"/>
+  <vehicle id="veh153" type="noncav100" route="loop_ccw_3" depart="4.0" departLane="0" departPos="246.1" departSpeed="max"/>
+  <vehicle id="veh112" type="noncav100" route="loop_ccw_0" depart="4.1" departLane="1" departPos="448.8" departSpeed="max"/>
+  <vehicle id="veh132" type="noncav100" route="loop_cw_2" depart="4.1" departLane="0" departPos="176.9" departSpeed="max"/>
+  <vehicle id="veh195" type="noncav100" route="loop_cw_3" depart="4.1" departLane="1" departPos="179.1" departSpeed="max"/>
+  <vehicle id="veh106" type="noncav100" route="loop_ccw_1" depart="4.2" departLane="0" departPos="371.0" departSpeed="max"/>
+  <vehicle id="veh103" type="noncav100" route="loop_ccw_3" depart="4.3" departLane="1" departPos="449.5" departSpeed="max"/>
+  <vehicle id="veh198" type="noncav100" route="loop_cw_0" depart="4.3" departLane="0" departPos="317.6" departSpeed="max"/>
+  <vehicle id="veh81" type="noncav100" route="loop_cw_1" depart="4.4" departLane="0" departPos="440.9" departSpeed="max"/>
+  <vehicle id="veh131" type="noncav100" route="loop_cw_2" depart="4.4" departLane="0" departPos="378.1" departSpeed="max"/>
+  <vehicle id="veh135" type="noncav100" route="loop_ccw_3" depart="4.4" departLane="0" departPos="315.5" departSpeed="max"/>
+  <vehicle id="veh142" type="noncav100" route="loop_ccw_2" depart="4.4" departLane="0" departPos="178.6" departSpeed="max"/>
+  <vehicle id="veh91" type="noncav100" route="loop_ccw_2" depart="4.5" departLane="1" departPos="171.8" departSpeed="max"/>
+  <vehicle id="veh138" type="noncav100" route="loop_ccw_0" depart="4.5" departLane="1" departPos="311.8" departSpeed="max"/>
+  <vehicle id="veh152" type="noncav100" route="loop_cw_2" depart="4.5" departLane="0" departPos="110.6" departSpeed="max"/>
+  <vehicle id="veh95" type="noncav100" route="loop_ccw_1" depart="4.6" departLane="0" departPos="170.4" departSpeed="max"/>
+  <vehicle id="veh126" type="noncav100" route="loop_cw_1" depart="4.7" departLane="1" departPos="110.4" departSpeed="max"/>
+  <vehicle id="veh158" type="noncav100" route="loop_ccw_2" depart="4.7" departLane="1" departPos="57.1" departSpeed="max"/>
+  <vehicle id="veh99" type="noncav100" route="loop_cw_2" depart="4.8" departLane="0" departPos="245.0" departSpeed="max"/>
+  <vehicle id="veh146" type="noncav100" route="loop_ccw_3" depart="4.8" departLane="1" departPos="375.7" departSpeed="max"/>
+  <vehicle id="veh172" type="noncav100" route="loop_cw_3" depart="4.8" departLane="0" departPos="173.4" departSpeed="max"/>
+  <vehicle id="veh189" type="noncav100" route="loop_ccw_2" depart="4.8" departLane="1" departPos="313.2" departSpeed="max"/>
 </routes>

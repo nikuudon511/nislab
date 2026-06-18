@@ -199,6 +199,7 @@ struct TrafficFlowVehicleSnapshot
   double y = 0.0;
   double loopPositionMeters = 0.0;
   double speedMps = 0.0;
+  int direction = 0;
 };
 
 struct TrafficFlowSegmentStats
@@ -206,6 +207,8 @@ struct TrafficFlowSegmentStats
   uint32_t vehicleCount = 0;
   double averageSpeedMps = 0.0;
   double cbr = 0.0;
+  double observedCpmTxRateHz = 0.0;
+  double observedCpmSizeBytes = 0.0;
 };
 
 struct PriorityMotionState
@@ -223,6 +226,10 @@ struct PredictiveRmrConfig
   double trafficFlowRoadLengthMeters = 2000.0;
   double trafficFlowMessageRateHz = 10.0;
   double trafficFlowAvgPacketSizeBytes = 500.0;
+  double trafficFlowChannelRateMbps = 6.0;
+  double rsuPassivePdrLowCbr = 0.95;
+  double rsuPassivePdrMidCbr = 0.90;
+  double rsuPassiveSaturationCbr = 0.90;
   double cpmSizeWeight = 0.0;
   double cpmTxRateWeight = 0.0;
   double activeVehicleWeight = 0.0;
@@ -251,6 +258,9 @@ static std::vector<TrafficFlowRsuInfo> g_trafficFlowRsus;
 static std::ofstream g_routeLog;
 static std::ofstream g_observationLog;
 static ThesisEvaluationStats g_thesisStats;
+static uint32_t g_thesisEvalStartMinVehicles = 0;
+static bool g_thesisEvalStartUseAllVehicles = true;
+static bool g_thesisEvaluationStarted = false;
 static uint64_t g_camRx = 0;
 static uint64_t g_cpmRx = 0;
 static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>> g_latestCpmRxByReceiver;
@@ -295,6 +305,7 @@ static double g_dsrcInterferenceOfferedCbr = 0.0;
 static double g_predictiveChannelRateBps = 6.0e6;
 static Ptr<UniformRandomVariable> g_hybridRouteRandom;
 static uint32_t g_maxCommunicationVehicles = 0;
+static uint32_t g_communicationVehicleCount = 0;
 static double g_idealMecDownlinkPdr = 1.0;
 static Ptr<UniformRandomVariable> g_idealMecDownlinkRandom;
 
@@ -312,7 +323,7 @@ RouteName (ActiveRoute route)
 {
   if (route == ActiveRoute::DsrcV2v)
     {
-      return "DSRC_V2V";
+      return "LEGACY_V2V";
     }
   if (route == ActiveRoute::NrSidelinkV2v)
     {
@@ -327,7 +338,7 @@ RouteStateName (bool dsrcActive, bool nrActive, bool mecActive)
   std::string name;
   if (dsrcActive)
     {
-      name += "DSRC_V2V";
+      name += "LEGACY_V2V";
     }
   if (nrActive)
     {
@@ -595,9 +606,10 @@ DistanceMeters2d (const libsumo::TraCIPosition& a, const libsumo::TraCIPosition&
 }
 
 static double
-ProjectLoop1kmPositionMeters (const libsumo::TraCIPosition& position)
+ProjectLoopPositionMeters (const libsumo::TraCIPosition& position)
 {
-  constexpr double sideMeters = 250.0;
+  const double sideMeters =
+      std::max (g_predictiveRmrConfig.trafficFlowRoadLengthMeters / 4.0, 1.0);
   auto clampSide = [sideMeters] (double value) {
     return std::max (0.0, std::min (sideMeters, value));
   };
@@ -615,12 +627,20 @@ ProjectLoop1kmPositionMeters (const libsumo::TraCIPosition& position)
       {std::abs (position.x), (3.0 * sideMeters) + (sideMeters - clampSide (position.y))},
   }};
 
-  return std::min_element (candidates.begin (),
-                           candidates.end (),
-                           [] (const Candidate& lhs, const Candidate& rhs) {
-                             return lhs.distanceToEdge < rhs.distanceToEdge;
-                           })
-      ->loopPosition;
+  double loopPosition =
+      std::min_element (candidates.begin (),
+                        candidates.end (),
+                        [] (const Candidate& lhs, const Candidate& rhs) {
+                          return lhs.distanceToEdge < rhs.distanceToEdge;
+                        })
+          ->loopPosition;
+  const double loopLengthMeters = std::max (g_predictiveRmrConfig.trafficFlowRoadLengthMeters, 1.0);
+  loopPosition = std::fmod (loopPosition, loopLengthMeters);
+  if (loopPosition < 0.0)
+    {
+      loopPosition += loopLengthMeters;
+    }
+  return loopPosition;
 }
 
 static bool
@@ -886,14 +906,14 @@ GenerateIdealMecCpm ()
           continue;
         }
 
-      vehiclePositions.push_back ({entry.first, pos, ProjectLoop1kmPositionMeters (pos)});
+      vehiclePositions.push_back ({entry.first, pos, ProjectLoopPositionMeters (pos)});
       if (entry.second.mecTxActive)
         {
           activeSenderIndexes.push_back (vehiclePositions.size () - 1);
         }
     }
 
-  constexpr double loopLengthMeters = 1000.0;
+  const double loopLengthMeters = std::max (g_predictiveRmrConfig.trafficFlowRoadLengthMeters, 1.0);
   std::vector<IdealMecLoopIndexEntry> loopIndex;
   loopIndex.reserve (vehiclePositions.size () * 3);
   for (std::size_t i = 0; i < vehiclePositions.size (); ++i)
@@ -1069,6 +1089,30 @@ IsClosingHighPriorityObject (uint64_t egoStationId,
 
   const double ttcSeconds = distanceMeters / closingSpeed;
   return ttcSeconds <= g_priorityTtcThresholdSeconds;
+}
+
+static bool
+ShouldAccumulateThesisMetrics ()
+{
+  if (g_thesisEvaluationStarted)
+    {
+      return true;
+    }
+  if (g_thesisEvalStartMinVehicles == 0)
+    {
+      g_thesisEvaluationStarted = true;
+      return true;
+    }
+
+  const uint32_t vehicleCount =
+      g_thesisEvalStartUseAllVehicles ? static_cast<uint32_t> (g_allVehicleNodes.size ())
+                                      : static_cast<uint32_t> (g_vehicleRuntime.size ());
+  if (vehicleCount >= g_thesisEvalStartMinVehicles)
+    {
+      g_thesisEvaluationStarted = true;
+      return true;
+    }
+  return false;
 }
 
 static void
@@ -1331,7 +1375,8 @@ AccumulateThesisPacketLossCounters (Ptr<MetricSupervisor> dsrcMetrics,
                                     Ptr<MetricSupervisor> nrMetrics,
                                     Ptr<MetricSupervisor> mecMetrics,
                                     Ptr<TraciClient> sumoClient,
-                                    double baselineMeters)
+                                    double baselineMeters,
+                                    bool accumulate = true)
 {
   const auto cpmType = MetricSupervisor::messageType_cpm;
 
@@ -1358,13 +1403,11 @@ AccumulateThesisPacketLossCounters (Ptr<MetricSupervisor> dsrcMetrics,
     {
       const ReceiverPriorityCounts receivers =
           CountReceiversByPriorityWithinBaseline (sumoClient, entry.first, baselineMeters);
-      const uint64_t totalReceivers = receivers.Total ();
 
       const uint64_t dsrcTx =
           entry.second.dsrcContainer->getCPBasicService ()->getCpmSent ();
       const uint64_t dsrcLastTx = g_thesisStats.dsrcLastCpmTxByVehicle[entry.first];
       const uint64_t dsrcDeltaTx = dsrcTx - dsrcLastTx;
-      g_thesisStats.dsrcIdealCpmRx += dsrcDeltaTx * totalReceivers;
       dsrcHighIdealDelta += dsrcDeltaTx * receivers.high;
       dsrcLowIdealDelta += dsrcDeltaTx * receivers.low;
       g_thesisStats.dsrcLastCpmTxByVehicle[entry.first] = dsrcTx;
@@ -1375,7 +1418,6 @@ AccumulateThesisPacketLossCounters (Ptr<MetricSupervisor> dsrcMetrics,
               entry.second.nrContainer->getCPBasicService ()->getCpmSent ();
           const uint64_t nrLastTx = g_thesisStats.nrLastCpmTxByVehicle[entry.first];
           const uint64_t nrDeltaTx = nrTx - nrLastTx;
-          g_thesisStats.nrIdealCpmRx += nrDeltaTx * totalReceivers;
           nrHighIdealDelta += nrDeltaTx * receivers.high;
           nrLowIdealDelta += nrDeltaTx * receivers.low;
           g_thesisStats.nrLastCpmTxByVehicle[entry.first] = nrTx;
@@ -1387,11 +1429,15 @@ AccumulateThesisPacketLossCounters (Ptr<MetricSupervisor> dsrcMetrics,
               entry.second.mecContainer->getCPBasicService ()->getCpmSent ();
           const uint64_t mecLastTx = g_thesisStats.mecLastCpmTxByVehicle[entry.first];
           const uint64_t mecDeltaTx = mecTx - mecLastTx;
-          g_thesisStats.mecIdealCpmRx += mecDeltaTx * totalReceivers;
           mecHighIdealDelta += mecDeltaTx * receivers.high;
           mecLowIdealDelta += mecDeltaTx * receivers.low;
           g_thesisStats.mecLastCpmTxByVehicle[entry.first] = mecTx;
         }
+    }
+
+  if (!accumulate)
+    {
+      return;
     }
 
   auto allocateTrueRx = [] (uint64_t trueRx, uint64_t classIdeal, uint64_t routeIdeal) {
@@ -1406,6 +1452,9 @@ AccumulateThesisPacketLossCounters (Ptr<MetricSupervisor> dsrcMetrics,
   const uint64_t dsrcIdealDelta = dsrcHighIdealDelta + dsrcLowIdealDelta;
   const uint64_t nrIdealDelta = nrHighIdealDelta + nrLowIdealDelta;
   const uint64_t mecIdealDelta = mecHighIdealDelta + mecLowIdealDelta;
+  g_thesisStats.dsrcIdealCpmRx += dsrcIdealDelta;
+  g_thesisStats.nrIdealCpmRx += nrIdealDelta;
+  g_thesisStats.mecIdealCpmRx += mecIdealDelta;
   const uint64_t dsrcTrueDelta = std::min (dsrcDeltaRx, dsrcIdealDelta);
   const uint64_t nrTrueDelta = std::min (nrDeltaRx, nrIdealDelta);
   const uint64_t mecTrueDelta = std::min (mecDeltaRx, mecIdealDelta);
@@ -1436,12 +1485,17 @@ SampleThesisMetrics (Ptr<MetricSupervisor> dsrcMetrics,
                      double baselineMeters,
                      Time interval)
 {
-  AccumulateThesisRecognitionSample ();
+  const bool accumulate = ShouldAccumulateThesisMetrics ();
+  if (accumulate)
+    {
+      AccumulateThesisRecognitionSample ();
+    }
   AccumulateThesisPacketLossCounters (dsrcMetrics,
                                       nrMetrics,
                                       mecMetrics,
                                       sumoClient,
-                                      baselineMeters);
+                                      baselineMeters,
+                                      accumulate);
 
   Simulator::Schedule (interval,
                        &SampleThesisMetrics,
@@ -1578,19 +1632,25 @@ FormatThesisMetric (double value)
   return stream.str ();
 }
 
+static Ptr<BSContainer>
+GetPrimaryCpmContainer (const VehicleRuntime& runtime)
+{
+  return runtime.nrContainer != nullptr ? runtime.nrContainer : runtime.dsrcContainer;
+}
+
 static double
-AverageLatestDsrcCpmSizeBytes ()
+AverageLatestPrimaryCpmSizeBytes ()
 {
   double sizeSum = 0.0;
   uint32_t samples = 0;
   for (const auto& entry : g_vehicleRuntime)
     {
-      if (entry.second.dsrcContainer == nullptr)
+      Ptr<BSContainer> primaryContainer = GetPrimaryCpmContainer (entry.second);
+      if (primaryContainer == nullptr)
         {
           continue;
         }
-      const uint32_t sizeBytes =
-          entry.second.dsrcContainer->getCPBasicService ()->getLastCpmSizeBytes ();
+      const uint32_t sizeBytes = primaryContainer->getCPBasicService ()->getLastCpmSizeBytes ();
       if (sizeBytes > 0)
         {
           sizeSum += static_cast<double> (sizeBytes);
@@ -1643,13 +1703,55 @@ AverageVehicleSpeedMetersPerSecond ()
 }
 
 static double
-EstimateTrafficCbrFromVehicleCount (double vehicleCount, double packetSizeBits)
+EstimateTrafficCbrFromVehicleCount (double vehicleCount,
+                                    double packetSizeBits,
+                                    double messageRateHz)
 {
   const double channelRateBps = std::max (g_predictiveChannelRateBps, 1.0);
   const double loadBps =
-      std::max (0.0, vehicleCount) * g_predictiveRmrConfig.trafficFlowMessageRateHz *
-      packetSizeBits;
+      std::max (0.0, vehicleCount) * std::max (0.0, messageRateHz) * packetSizeBits;
   return Clamp01 (loadBps / channelRateBps);
+}
+
+static double
+ComputeRsuPassiveObservationPdr (double referenceCbr)
+{
+  return referenceCbr >= g_predictiveRmrConfig.rsuPassiveSaturationCbr
+             ? 0.0
+             : (referenceCbr >= g_hybridRouteConfig.switchCbr
+                    ? g_predictiveRmrConfig.rsuPassivePdrMidCbr
+                    : g_predictiveRmrConfig.rsuPassivePdrLowCbr);
+}
+
+static double
+NormalizeTrafficFlowLoopPosition (double positionMeters)
+{
+  const double roadLengthM = std::max (g_predictiveRmrConfig.trafficFlowRoadLengthMeters, 1.0);
+  double normalized = std::fmod (positionMeters, roadLengthM);
+  if (normalized < 0.0)
+    {
+      normalized += roadLengthM;
+    }
+  return normalized;
+}
+
+static bool
+IsTrafficFlowPositionInSegment (double positionMeters, double segmentStartM, double segmentEndM)
+{
+  const double roadLengthM = std::max (g_predictiveRmrConfig.trafficFlowRoadLengthMeters, 1.0);
+  if (segmentEndM - segmentStartM >= roadLengthM)
+    {
+      return true;
+    }
+
+  const double position = NormalizeTrafficFlowLoopPosition (positionMeters);
+  const double start = NormalizeTrafficFlowLoopPosition (segmentStartM);
+  const double end = NormalizeTrafficFlowLoopPosition (segmentEndM);
+  if (start <= end)
+    {
+      return position >= start && position < end;
+    }
+  return position >= start || position < end;
 }
 
 static std::vector<TrafficFlowVehicleSnapshot>
@@ -1661,7 +1763,7 @@ ReadTrafficFlowVehicleSnapshots ()
       return vehicles;
     }
 
-  for (const auto& entry : g_vehicleRuntime)
+  for (const auto& entry : g_allVehicleNodes)
     {
       try
         {
@@ -1671,8 +1773,10 @@ ReadTrafficFlowVehicleSnapshots ()
           snapshot.id = entry.first;
           snapshot.x = position.x;
           snapshot.y = position.y;
-          snapshot.loopPositionMeters = ProjectLoop1kmPositionMeters (position);
+          snapshot.loopPositionMeters = ProjectLoopPositionMeters (position);
           snapshot.speedMps = std::max (0.0, g_sumoClient->TraCIAPI::vehicle.getSpeed (entry.first));
+          const std::string roadId = g_sumoClient->TraCIAPI::vehicle.getRoadID (entry.first);
+          snapshot.direction = roadId.rfind ("loop_r", 0) == 0 ? -1 : 1;
           vehicles.push_back (snapshot);
         }
       catch (...)
@@ -1686,22 +1790,65 @@ static TrafficFlowSegmentStats
 ComputeTrafficFlowSegmentStats (const std::vector<TrafficFlowVehicleSnapshot>& vehicles,
                                 double segmentStartM,
                                 double segmentEndM,
-                                double packetSizeBits)
+                                double packetSizeBits,
+                                int directionFilter = 0)
 {
   TrafficFlowSegmentStats stats;
   double speedSum = 0.0;
+  double cpmSizeSum = 0.0;
+  double cpmTxRateSum = 0.0;
+  uint32_t cpmSizeSamples = 0;
+  uint32_t cpmTxRateSamples = 0;
   for (const auto& vehicle : vehicles)
     {
-      if (vehicle.loopPositionMeters >= segmentStartM && vehicle.loopPositionMeters < segmentEndM)
+      if (directionFilter != 0 && vehicle.direction != directionFilter)
+        {
+          continue;
+        }
+      if (IsTrafficFlowPositionInSegment (vehicle.loopPositionMeters, segmentStartM, segmentEndM))
         {
           ++stats.vehicleCount;
           speedSum += vehicle.speedMps;
+
+          const auto runtimeIt = g_vehicleRuntime.find (vehicle.id);
+          if (runtimeIt != g_vehicleRuntime.end ())
+            {
+              Ptr<BSContainer> primaryContainer = GetPrimaryCpmContainer (runtimeIt->second);
+              if (primaryContainer != nullptr)
+                {
+                  const uint32_t sizeBytes =
+                      primaryContainer->getCPBasicService ()->getLastCpmSizeBytes ();
+                  if (sizeBytes > 0)
+                    {
+                      cpmSizeSum += static_cast<double> (sizeBytes);
+                      ++cpmSizeSamples;
+                    }
+                }
+
+              const auto stateIt = g_predictiveCbrState.find (vehicle.id);
+              if (stateIt != g_predictiveCbrState.end () && stateIt->second.initialized &&
+                  stateIt->second.dsrcCpmTxRate > 0.0)
+                {
+                  cpmTxRateSum += stateIt->second.dsrcCpmTxRate;
+                  ++cpmTxRateSamples;
+                }
+            }
         }
     }
 
   stats.averageSpeedMps =
       stats.vehicleCount > 0 ? speedSum / static_cast<double> (stats.vehicleCount) : 0.0;
-  stats.cbr = EstimateTrafficCbrFromVehicleCount (stats.vehicleCount, packetSizeBits);
+  stats.observedCpmSizeBytes =
+      cpmSizeSamples > 0
+          ? cpmSizeSum / static_cast<double> (cpmSizeSamples)
+          : std::max (packetSizeBits / 8.0, g_predictiveRmrConfig.trafficFlowAvgPacketSizeBytes);
+  stats.observedCpmTxRateHz =
+      cpmTxRateSamples > 0
+          ? cpmTxRateSum / static_cast<double> (cpmTxRateSamples)
+          : g_predictiveRmrConfig.trafficFlowMessageRateHz;
+  stats.cbr = EstimateTrafficCbrFromVehicleCount (stats.vehicleCount,
+                                                  stats.observedCpmSizeBytes * 8.0,
+                                                  stats.observedCpmTxRateHz);
   return stats;
 }
 
@@ -1737,6 +1884,7 @@ UpdateRsuSharedTrafficFlowPrediction (double packetSizeBits)
   double upstreamVehicleSum = 0.0;
   double futureVehicleSum = 0.0;
   double predictedCbrSum = 0.0;
+  double localCbrSum = 0.0;
   double predictedCbrMax = 0.0;
   uint32_t metricCount = 0;
 
@@ -1745,40 +1893,73 @@ UpdateRsuSharedTrafficFlowPrediction (double packetSizeBits)
       libsumo::TraCIPosition rsuPosition;
       rsuPosition.x = rsu.x;
       rsuPosition.y = rsu.y;
-      const double rsuLoopPosition = ProjectLoop1kmPositionMeters (rsuPosition);
-      const double localStart = std::max (0.0, rsuLoopPosition - halfSegmentM);
-      const double localEnd = rsu.x + halfSegmentM;
-      const double upstreamStart = std::max (0.0, localStart - segmentLengthM);
-      const double upstreamEnd = localStart;
+      const double rsuLoopPosition = ProjectLoopPositionMeters (rsuPosition);
+      const double localStart = rsuLoopPosition - halfSegmentM;
+      const double localEnd = rsuLoopPosition + halfSegmentM;
+      const double cwUpstreamStart = localStart - segmentLengthM;
+      const double cwUpstreamEnd = localStart;
+      const double ccwUpstreamStart = localEnd;
+      const double ccwUpstreamEnd = localEnd + segmentLengthM;
 
       const TrafficFlowSegmentStats local =
           ComputeTrafficFlowSegmentStats (vehicles, localStart, localEnd, packetSizeBits);
-      TrafficFlowSegmentStats upstream;
-      if (upstreamEnd > upstreamStart)
-        {
-          upstream =
-              ComputeTrafficFlowSegmentStats (vehicles, upstreamStart, upstreamEnd, packetSizeBits);
-        }
-      else
-        {
-          upstream = local;
-        }
+      const TrafficFlowSegmentStats localCw =
+          ComputeTrafficFlowSegmentStats (vehicles, localStart, localEnd, packetSizeBits, 1);
+      const TrafficFlowSegmentStats localCcw =
+          ComputeTrafficFlowSegmentStats (vehicles, localStart, localEnd, packetSizeBits, -1);
+      const TrafficFlowSegmentStats upstreamCw =
+          ComputeTrafficFlowSegmentStats (vehicles,
+                                          cwUpstreamStart,
+                                          cwUpstreamEnd,
+                                          packetSizeBits,
+                                          1);
+      const TrafficFlowSegmentStats upstreamCcw =
+          ComputeTrafficFlowSegmentStats (vehicles,
+                                          ccwUpstreamStart,
+                                          ccwUpstreamEnd,
+                                          packetSizeBits,
+                                          -1);
 
       const double qIn =
-          ComputeTrafficFlowRate (upstream.vehicleCount, upstream.averageSpeedMps, segmentLengthM);
+          ComputeTrafficFlowRate (upstreamCw.vehicleCount,
+                                  upstreamCw.averageSpeedMps,
+                                  segmentLengthM) +
+          ComputeTrafficFlowRate (upstreamCcw.vehicleCount,
+                                  upstreamCcw.averageSpeedMps,
+                                  segmentLengthM);
       const double qOut =
-          ComputeTrafficFlowRate (local.vehicleCount, local.averageSpeedMps, segmentLengthM);
+          ComputeTrafficFlowRate (localCw.vehicleCount, localCw.averageSpeedMps, segmentLengthM) +
+          ComputeTrafficFlowRate (localCcw.vehicleCount, localCcw.averageSpeedMps, segmentLengthM);
       const double futureVehicles =
           std::max (0.0, static_cast<double> (local.vehicleCount) + (qIn - qOut) * horizonSeconds);
+      const double upstreamObservedCpmSizeBytes =
+          (upstreamCw.observedCpmSizeBytes + upstreamCcw.observedCpmSizeBytes) / 2.0;
+      const double upstreamObservedCpmTxRateHz =
+          (upstreamCw.observedCpmTxRateHz + upstreamCcw.observedCpmTxRateHz) / 2.0;
+      const double observedCpmSizeBytes =
+          local.observedCpmSizeBytes > 0.0 ? local.observedCpmSizeBytes
+                                           : upstreamObservedCpmSizeBytes;
+      const double observedCpmTxRateHz =
+          local.observedCpmTxRateHz > 0.0 ? local.observedCpmTxRateHz
+                                          : upstreamObservedCpmTxRateHz;
+      const double referenceCbr = std::max ({local.cbr, upstreamCw.cbr, upstreamCcw.cbr});
+      const double passivePdr = ComputeRsuPassiveObservationPdr (referenceCbr);
+      const double passiveObservedCpmTxRateHz = observedCpmTxRateHz * passivePdr;
       const double predictedCbr =
-          EstimateTrafficCbrFromVehicleCount (futureVehicles, packetSizeBits);
+          referenceCbr >= g_predictiveRmrConfig.rsuPassiveSaturationCbr
+              ? 1.0
+              : EstimateTrafficCbrFromVehicleCount (futureVehicles,
+                                                    observedCpmSizeBytes * 8.0,
+                                                    passiveObservedCpmTxRateHz);
 
       qInSum += qIn;
       qOutSum += qOut;
       localVehicleSum += static_cast<double> (local.vehicleCount);
-      upstreamVehicleSum += static_cast<double> (upstream.vehicleCount);
+      upstreamVehicleSum +=
+          static_cast<double> (upstreamCw.vehicleCount + upstreamCcw.vehicleCount);
       futureVehicleSum += futureVehicles;
       predictedCbrSum += predictedCbr;
+      localCbrSum += local.cbr;
       predictedCbrMax = std::max (predictedCbrMax, predictedCbr);
       ++metricCount;
     }
@@ -1799,8 +1980,7 @@ UpdateRsuSharedTrafficFlowPrediction (double packetSizeBits)
   g_trafficFlowPrediction.rsuCount = metricCount;
   g_trafficFlowPrediction.trafficFlowCbr = predictedCbrMax;
   g_trafficFlowPrediction.deltaCbr =
-      std::max (0.0, predictedCbrMax - EstimateTrafficCbrFromVehicleCount (localVehicleSum * invCount,
-                                                                           packetSizeBits));
+      std::max (0.0, predictedCbrMax - localCbrSum * invCount);
   return true;
 }
 
@@ -1833,7 +2013,7 @@ UpdateTrafficFlowCbrPrediction (Time interval)
           std::max (0.0, g_trafficFlowPrediction.qOutVehiclesPerSecond + activeVehicleRate);
     }
 
-  const double packetSizeBits = AverageLatestDsrcCpmSizeBytes () * 8.0;
+  const double packetSizeBits = AverageLatestPrimaryCpmSizeBytes () * 8.0;
   const bool usedRsuSharedPrediction = UpdateRsuSharedTrafficFlowPrediction (packetSizeBits);
   if (usedRsuSharedPrediction)
     {
@@ -1908,7 +2088,8 @@ OpenObservationLog (const std::string& path)
 }
 
 static void
-WriteObservationLog (Ptr<MetricSupervisor> dsrcMetrics,
+WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
+                     Ptr<MetricSupervisor> dsrcMetrics,
                      Ptr<MetricSupervisor> nrMetrics,
                      Ptr<MetricSupervisor> mecMetrics,
                      Time interval)
@@ -1975,7 +2156,7 @@ WriteObservationLog (Ptr<MetricSupervisor> dsrcMetrics,
           ++dualRouteCount;
         }
 
-      const double cbr = dsrcMetrics->getCBRPerItem (entry.first);
+      const double cbr = channelMetrics->getCBRPerItem (entry.first);
       if (cbr >= 0.0)
         {
           cbrSum += cbr;
@@ -2135,15 +2316,21 @@ WriteObservationLog (Ptr<MetricSupervisor> dsrcMetrics,
                        << FormatThesisMetric (lowNeverReceivedRate) << std::endl;
     }
 
-  Simulator::Schedule (interval, &WriteObservationLog, dsrcMetrics, nrMetrics, mecMetrics, interval);
+  Simulator::Schedule (interval,
+                       &WriteObservationLog,
+                       channelMetrics,
+                       dsrcMetrics,
+                       nrMetrics,
+                       mecMetrics,
+                       interval);
 }
 
 static void
-UpdateReactiveRmrCbr (Ptr<MetricSupervisor> dsrcMetrics, Time interval)
+UpdateReactiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
 {
   for (auto& entry : g_vehicleRuntime)
     {
-      const double cbr = dsrcMetrics->getCBRPerItem (entry.first);
+      const double cbr = channelMetrics->getCBRPerItem (entry.first);
       const double effectiveCbr = cbr >= 0.0 ? cbr : 0.0;
       entry.second.dsrcContainer->getCPBasicService ()->setRmrCurrentCbr (effectiveCbr);
       if (entry.second.nrContainer != nullptr)
@@ -2156,11 +2343,11 @@ UpdateReactiveRmrCbr (Ptr<MetricSupervisor> dsrcMetrics, Time interval)
         }
     }
 
-  Simulator::Schedule (interval, &UpdateReactiveRmrCbr, dsrcMetrics, interval);
+  Simulator::Schedule (interval, &UpdateReactiveRmrCbr, channelMetrics, interval);
 }
 
 static void
-UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> dsrcMetrics, Time interval)
+UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
 {
   const Time now = Simulator::Now ();
   UpdateTrafficFlowCbrPrediction (interval);
@@ -2173,13 +2360,13 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> dsrcMetrics, Time interval)
   for (auto& entry : g_vehicleRuntime)
     {
       const std::string& vehicleId = entry.first;
-      const double measuredCbr = dsrcMetrics->getCBRPerItem (vehicleId);
-      const double currentCbr =
-          std::max (measuredCbr >= 0.0 ? measuredCbr : 0.0, g_dsrcInterferenceOfferedCbr);
+      const double measuredCbr = channelMetrics->getCBRPerItem (vehicleId);
+      const double currentCbr = measuredCbr >= 0.0 ? measuredCbr : 0.0;
 
-      Ptr<CPBasicService> dsrcCp = entry.second.dsrcContainer->getCPBasicService ();
-      const uint64_t cpmTx = dsrcCp->getCpmSent ();
-      const uint32_t cpmSizeBytes = dsrcCp->getLastCpmSizeBytes ();
+      Ptr<BSContainer> primaryContainer = GetPrimaryCpmContainer (entry.second);
+      Ptr<CPBasicService> primaryCp = primaryContainer->getCPBasicService ();
+      const uint64_t cpmTx = primaryCp->getCpmSent ();
+      const uint32_t cpmSizeBytes = primaryCp->getLastCpmSizeBytes ();
 
       PredictiveCbrState& state = g_predictiveCbrState[vehicleId];
       double elapsedSeconds = interval.GetSeconds ();
@@ -2210,8 +2397,7 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> dsrcMetrics, Time interval)
               ? state.dsrcCpmTxRate / g_predictiveRmrConfig.cpmTxRateNorm
               : 0.0;
 
-      const double trafficFlowCbr =
-          std::max (g_trafficFlowPrediction.trafficFlowCbr, g_dsrcInterferenceOfferedCbr);
+      const double trafficFlowCbr = g_trafficFlowPrediction.trafficFlowCbr;
       const double predictedCbr =
           Clamp01 (std::max (currentCbr, trafficFlowCbr) +
                    g_trafficFlowPrediction.deltaCbr +
@@ -2240,7 +2426,7 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> dsrcMetrics, Time interval)
 
   Simulator::Schedule (interval,
                        &UpdatePredictiveRmrCbr,
-                       dsrcMetrics,
+                       channelMetrics,
                        interval);
 }
 
@@ -2752,6 +2938,8 @@ main (int argc, char* argv[])
   uint32_t sumoPort = 3400;
   double observationLogInterval = 1.0;
   double thesisEvalInterval = 1.0;
+  uint32_t thesisEvalStartMinVehicles = 0;
+  bool thesisEvalStartUseAllVehicles = true;
   double dsrcDccBitRateMbps = 6.0;
   double dsrcInterferenceStart = 1.0;
   double dsrcInterferenceStop = 0.0;
@@ -2776,6 +2964,10 @@ main (int argc, char* argv[])
   double trafficFlowRoadLengthMeters = 2000.0;
   double trafficFlowMessageRateHz = 10.0;
   double trafficFlowAvgPacketSizeBytes = 500.0;
+  double trafficFlowChannelRateMbps = 6.0;
+  double rsuPassivePdrLowCbr = 0.95;
+  double rsuPassivePdrMidCbr = 0.90;
+  double rsuPassiveSaturationCbr = 0.90;
   double predictorCpmSizeWeight = 0.0;
   double predictorCpmTxRateWeight = 0.0;
   double predictorActiveVehicleWeight = 0.0;
@@ -2845,18 +3037,18 @@ main (int argc, char* argv[])
   std::string method = "legacy";
 
   CommandLine cmd (__FILE__);
-  cmd.AddValue ("phyMode", "802.11p PHY mode", phyMode);
+  cmd.AddValue ("phyMode", "Legacy V2V PHY mode; unused in NR-only evaluation", phyMode);
   cmd.AddValue ("userpriority", "EDCA User Priority for ETSI messages", userPriority);
   cmd.AddValue ("realtime", "Run with the realtime scheduler", realtime);
-  cmd.AddValue ("verbose", "Enable verbose 802.11p logging", verbose);
+  cmd.AddValue ("verbose", "Enable verbose legacy V2V logging", verbose);
   cmd.AddValue ("sumo-gui", "Show SUMO GUI", sumoGui);
   cmd.AddValue ("send-cpm", "Enable CPM dissemination in addition to CAM", sendCpm);
-  cmd.AddValue ("enable-dcc", "Enable ETSI DCC on the 802.11p route", enableDcc);
-  cmd.AddValue ("route-control", "Enable CBR-based DSRC-to-NR route switching", enableRouteControl);
-  cmd.AddValue ("dsrc-dcc-bitrate-mbps", "DCC bitrate value matching the 802.11p PHY mode", dsrcDccBitRateMbps);
-  cmd.AddValue ("dsrc-interference", "Enable NR sidelink UDP background traffic", enableDsrcInterference);
-  cmd.AddValue ("dsrc-interference-source", "Deprecated single-vehicle background source option", dsrcInterferenceSourceVehicle);
-  cmd.AddValue ("dsrc-interference-nodes", "Number of SUMO vehicle nodes sending NR sidelink background traffic", dsrcInterferenceNodeCount);
+  cmd.AddValue ("enable-dcc", "Enable ETSI DCC on the legacy V2V route", enableDcc);
+  cmd.AddValue ("route-control", "Enable legacy route-control mode; unused in NR-only evaluation", enableRouteControl);
+  cmd.AddValue ("dsrc-dcc-bitrate-mbps", "Legacy DCC bitrate; unused in NR-only evaluation", dsrcDccBitRateMbps);
+  cmd.AddValue ("dsrc-interference", "Deprecated alias for --nr-bg", enableDsrcInterference);
+  cmd.AddValue ("dsrc-interference-source", "Deprecated alias for --nr-bg-source", dsrcInterferenceSourceVehicle);
+  cmd.AddValue ("dsrc-interference-nodes", "Deprecated alias for --nr-bg-nodes", dsrcInterferenceNodeCount);
   cmd.AddValue ("dsrc-interference-per-vehicle",
                 "If true, every active SUMO vehicle emits background traffic while it is active",
                 dsrcInterferencePerVehicle);
@@ -2864,7 +3056,7 @@ main (int argc, char* argv[])
   cmd.AddValue ("dsrc-interference-interval-ms", "Background traffic interval [ms]", dsrcInterferenceIntervalMs);
   cmd.AddValue ("dsrc-interference-start", "Background traffic start time [s]", dsrcInterferenceStart);
   cmd.AddValue ("dsrc-interference-stop", "Background traffic stop time [s]; 0 means sim-time", dsrcInterferenceStop);
-  cmd.AddValue ("dsrc-interference-userpriority", "User Priority for background 802.11p traffic", dsrcInterferenceUserPriority);
+  cmd.AddValue ("dsrc-interference-userpriority", "Deprecated alias for --nr-bg-userpriority", dsrcInterferenceUserPriority);
   cmd.AddValue ("nr-bg", "Enable NR sidelink UDP background traffic", enableDsrcInterference);
   cmd.AddValue ("nr-bg-source", "Deprecated single-vehicle background source option", dsrcInterferenceSourceVehicle);
   cmd.AddValue ("nr-bg-nodes", "Number of SUMO vehicle nodes sending NR sidelink background traffic", dsrcInterferenceNodeCount);
@@ -2902,6 +3094,18 @@ main (int argc, char* argv[])
   cmd.AddValue ("traffic-flow-avg-packet-size",
                 "Fallback average CPM packet size [bytes] used by the RSU traffic-flow CBR predictor",
                 trafficFlowAvgPacketSizeBytes);
+  cmd.AddValue ("traffic-flow-channel-rate-mbps",
+                "Channel-rate denominator [Mbps] used by the RSU traffic-flow CBR predictor",
+                trafficFlowChannelRateMbps);
+  cmd.AddValue ("rsu-passive-pdr-low-cbr",
+                "Pseudo passive-listening PDR below --switch-cbr",
+                rsuPassivePdrLowCbr);
+  cmd.AddValue ("rsu-passive-pdr-mid-cbr",
+                "Pseudo passive-listening PDR between --switch-cbr and --rsu-passive-saturation-cbr",
+                rsuPassivePdrMidCbr);
+  cmd.AddValue ("rsu-passive-saturation-cbr",
+                "CBR where RSU prediction saturates to 1.0 instead of relying on passive-listening precision",
+                rsuPassiveSaturationCbr);
   cmd.AddValue ("predictor-cpm-size-norm",
                 "Normalization value for the CPM size predictor feature [bytes]",
                 predictorCpmSizeNormBytes);
@@ -2930,10 +3134,10 @@ main (int argc, char* argv[])
                 "Slope for reducing low-priority V2V probability after --switch-cbr",
                 hybridLowV2vAlpha);
   cmd.AddValue ("hybrid-high-dual-tx",
-                "Use DSRC V2V and MEC V2N2V together for high-priority congested CPMs",
+                "Use NR sidelink V2V and MEC V2N2V together for high-priority congested CPMs",
                 hybridHighPriorityDualTx);
   cmd.AddValue ("mec-duplicate-recovery",
-                "Send a full CPM copy through MEC while DSRC sends the RMR-reduced CPM under predictive congestion",
+                "Send a full CPM copy through MEC while NR sidelink sends the RMR-reduced CPM under predictive congestion",
                 mecDuplicateRecovery);
   cmd.AddValue ("mec-recovery-policy",
                 "MEC recovery policy: offload-only, staged, duplicate-always",
@@ -3018,12 +3222,12 @@ main (int argc, char* argv[])
   cmd.AddValue ("mec-srs-periodicity",
                 "LTE eNB RRC SRS periodicity [ms] for MEC Uu; use 320 for many UEs",
                 mecSrsPeriodicity);
-  cmd.AddValue ("pcap", "Enable 802.11p PCAP output", enablePcap);
+  cmd.AddValue ("pcap", "Enable legacy V2V PCAP output", enablePcap);
   cmd.AddValue ("sim-time", "Simulation time [s]", simTime);
   cmd.AddValue ("baseline", "PRR baseline [m]", baselinePrR);
   cmd.AddValue ("tx-power", "Tx power [dBm]", txPower);
-  cmd.AddValue ("switch-cbr", "CBR threshold to switch DSRC V2V to NR route", switchCbr);
-  cmd.AddValue ("release-cbr", "CBR threshold to release NR route back to DSRC V2V", releaseCbr);
+  cmd.AddValue ("switch-cbr", "CBR threshold to start MEC-assisted NR operation", switchCbr);
+  cmd.AddValue ("release-cbr", "CBR threshold to release MEC-assisted NR operation", releaseCbr);
   cmd.AddValue ("route-check-interval", "Route control interval [s]", routeCheckInterval);
   cmd.AddValue ("cbr-window-ms", "MetricSupervisor CBR window [ms]", cbrWindowMs);
   cmd.AddValue ("cbr-alpha", "MetricSupervisor CBR exponential average alpha", cbrAlpha);
@@ -3033,6 +3237,12 @@ main (int argc, char* argv[])
   cmd.AddValue ("summary-csv", "CSV file for one-line thesis summary metrics", summaryCsvPath);
   cmd.AddValue ("observation-log-interval", "Observation CSV write interval [s]", observationLogInterval);
   cmd.AddValue ("thesis-eval-interval", "Evaluation interval for thesis 4.3 metrics [s]", thesisEvalInterval);
+  cmd.AddValue ("thesis-eval-start-min-vehicles",
+                "Start thesis metric accumulation after this vehicle-count threshold; 0 starts immediately",
+                thesisEvalStartMinVehicles);
+  cmd.AddValue ("thesis-eval-start-use-all-vehicles",
+                "If true, the thesis evaluation start threshold counts all active SUMO vehicles; otherwise it counts communication vehicles only",
+                thesisEvalStartUseAllVehicles);
   cmd.AddValue ("sumo-folder", "Folder containing SUMO mobility trace", sumoFolder);
   cmd.AddValue ("mob-trace", "SUMO route file name", mobTrace);
   cmd.AddValue ("sumo-config", "SUMO configuration file", sumoConfig);
@@ -3141,6 +3351,8 @@ main (int argc, char* argv[])
     {
       NS_FATAL_ERROR ("thesis-eval-interval must be greater than 0");
     }
+  g_thesisEvalStartMinVehicles = thesisEvalStartMinVehicles;
+  g_thesisEvalStartUseAllVehicles = thesisEvalStartUseAllVehicles;
   if (sumoSyncInterval <= 0.0)
     {
       NS_FATAL_ERROR ("sumo-sync-interval must be greater than 0");
@@ -3180,6 +3392,10 @@ main (int argc, char* argv[])
   if (trafficFlowAvgPacketSizeBytes <= 0.0)
     {
       NS_FATAL_ERROR ("traffic-flow-avg-packet-size must be greater than 0");
+    }
+  if (trafficFlowChannelRateMbps <= 0.0)
+    {
+      NS_FATAL_ERROR ("traffic-flow-channel-rate-mbps must be greater than 0");
     }
   if (mecBackhaulDelayMs < 0.0)
     {
@@ -3253,10 +3469,13 @@ main (int argc, char* argv[])
   g_predictiveRmrConfig.trafficFlowRoadLengthMeters = trafficFlowRoadLengthMeters;
   g_predictiveRmrConfig.trafficFlowMessageRateHz = trafficFlowMessageRateHz;
   g_predictiveRmrConfig.trafficFlowAvgPacketSizeBytes = trafficFlowAvgPacketSizeBytes;
+  g_predictiveRmrConfig.rsuPassivePdrLowCbr = Clamp01 (rsuPassivePdrLowCbr);
+  g_predictiveRmrConfig.rsuPassivePdrMidCbr = Clamp01 (rsuPassivePdrMidCbr);
+  g_predictiveRmrConfig.rsuPassiveSaturationCbr = Clamp01 (rsuPassiveSaturationCbr);
   g_predictiveRmrConfig.cpmSizeWeight = predictorCpmSizeWeight;
   g_predictiveRmrConfig.cpmTxRateWeight = predictorCpmTxRateWeight;
   g_predictiveRmrConfig.activeVehicleWeight = predictorActiveVehicleWeight;
-  g_predictiveChannelRateBps = dsrcDccBitRateMbps * 1e6;
+  g_predictiveChannelRateBps = trafficFlowChannelRateMbps * 1e6;
   g_hybridRouteConfig.switchCbr = switchCbr;
   g_hybridRouteConfig.releaseCbr = releaseCbr;
   g_hybridRouteConfig.maxCbr = hybridCbrMax;
@@ -3883,16 +4102,35 @@ main (int argc, char* argv[])
   dsrcMetrics->setCBRAlphaValue (cbrAlpha);
   dsrcMetrics->setSimulationTimeValue (simTime);
   dsrcMetrics->setNodeContainer (vehicleNodes);
-  if (!cbrLogPath.empty ())
+  if (!enableNrSidelinkV2v && !cbrLogPath.empty ())
     {
       dsrcMetrics->writeCBRtoCSV (cbrLogPath);
       dsrcMetrics->enableCBRWriteToFile ();
     }
-  dsrcMetrics->startCheckCBR (numberOfNodes);
+  if (!enableNrSidelinkV2v)
+    {
+      dsrcMetrics->startCheckCBR (numberOfNodes);
+    }
 
   MetricSupervisor nrMetricsObj (baselinePrR);
   Ptr<MetricSupervisor> nrMetrics = &nrMetricsObj;
   nrMetrics->setTraCIClient (sumoClient);
+  nrMetrics->setChannelTechnology ("Nr");
+  nrMetrics->setCBRWindowValue (cbrWindowMs);
+  nrMetrics->setCBRAlphaValue (cbrAlpha);
+  nrMetrics->setSimulationTimeValue (simTime);
+  nrMetrics->setNodeContainer (vehicleNodes);
+  if (enableNrSidelinkV2v && !cbrLogPath.empty ())
+    {
+      nrMetrics->writeCBRtoCSV (cbrLogPath);
+      nrMetrics->enableCBRWriteToFile ();
+    }
+  if (enableNrSidelinkV2v)
+    {
+      nrMetrics->startCheckCBR (numberOfNodes);
+    }
+
+  Ptr<MetricSupervisor> channelMetrics = enableNrSidelinkV2v ? nrMetrics : dsrcMetrics;
 
   MetricSupervisor mecMetricsObj (baselinePrR);
   Ptr<MetricSupervisor> mecMetrics = &mecMetricsObj;
@@ -3931,10 +4169,25 @@ main (int argc, char* argv[])
     Ptr<Node> node = vehicleNodes.Get (nodeIndex);
     g_allVehicleNodes[vehicleId] = node;
     g_vehicleIdByStationId[stationId] = vehicleId;
-    if (g_maxCommunicationVehicles > 0 && stationId > g_maxCommunicationVehicles)
+
+    bool communicationVehicle = true;
+    try
+      {
+        const std::string typeId = sumoClient->TraCIAPI::vehicle.getTypeID (vehicleId);
+        communicationVehicle = typeId.rfind ("cav", 0) == 0;
+      }
+    catch (...)
+      {
+      }
+    if (!communicationVehicle)
       {
         return node;
       }
+    if (g_maxCommunicationVehicles > 0 && g_communicationVehicleCount >= g_maxCommunicationVehicles)
+      {
+        return node;
+      }
+    ++g_communicationVehicleCount;
 
     Ptr<Socket> dsrcSocket = GeoNet::createGNPacketSocket (node);
     dsrcSocket->SetPriority (userPriority);
@@ -4150,7 +4403,7 @@ main (int argc, char* argv[])
     {
       Simulator::Schedule (Seconds (routeCheckInterval),
                            &CheckRoutesByCbr,
-                           dsrcMetrics,
+                           channelMetrics,
                            switchCbr,
                            releaseCbr,
                            Seconds (routeCheckInterval));
@@ -4159,13 +4412,13 @@ main (int argc, char* argv[])
     {
       Simulator::Schedule (Seconds (routeCheckInterval),
                            &UpdatePredictiveRmrCbr,
-                           dsrcMetrics,
+                           channelMetrics,
                            Seconds (routeCheckInterval));
       if (enableMecRouteControl)
         {
           Simulator::Schedule (Seconds (routeCheckInterval) + MicroSeconds (1),
                                &CheckHybridRoutesByPredictedCbrToMec,
-                               dsrcMetrics,
+                               channelMetrics,
                                Seconds (routeCheckInterval));
         }
     }
@@ -4173,11 +4426,12 @@ main (int argc, char* argv[])
     {
       Simulator::Schedule (Seconds (routeCheckInterval),
                            &UpdateReactiveRmrCbr,
-                           dsrcMetrics,
+                           channelMetrics,
                            Seconds (routeCheckInterval));
     }
   Simulator::Schedule (Seconds (observationLogInterval),
                        &WriteObservationLog,
+                       channelMetrics,
                        dsrcMetrics,
                        nrMetrics,
                        mecMetrics,
@@ -4194,11 +4448,15 @@ main (int argc, char* argv[])
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
 
-  AccumulateThesisPacketLossCounters (dsrcMetrics,
-                                      nrMetrics,
-                                      mecMetrics,
-                                      sumoClient,
-                                      baselinePrR);
+  if (g_thesisEvaluationStarted || g_thesisEvalStartMinVehicles == 0)
+    {
+      AccumulateThesisPacketLossCounters (dsrcMetrics,
+                                          nrMetrics,
+                                          mecMetrics,
+                                          sumoClient,
+                                          baselinePrR,
+                                          true);
+    }
 
   std::cout << "Run terminated." << std::endl;
   std::cout << "CAM RX callbacks: " << g_camRx << std::endl;
@@ -4281,8 +4539,7 @@ main (int argc, char* argv[])
       g_useIdealMecLink ? Percentile (g_idealMecLatencySamplesMs, 99.0)
                         : mecMetrics->getLatencyPercentile_messagetype (cpmType, 99.0);
   const double effectiveChannelBusyRatio =
-      std::max (static_cast<double> (dsrcMetrics->getAverageCBROverall ()),
-                g_dsrcInterferenceOfferedCbr);
+      static_cast<double> (channelMetrics->getAverageCBROverall ());
   std::cout << "Thesis 4.3 recognition rate (%): "
             << FormatThesisMetric (recognitionRate) << std::endl;
   std::cout << "Thesis 4.3 object recognition rate (%): "
@@ -4315,20 +4572,20 @@ main (int argc, char* argv[])
             << g_thesisStats.highIdealCpmRx << "/" << g_thesisStats.highTrueCpmRx
             << ", Low=" << g_thesisStats.lowIdealCpmRx << "/"
             << g_thesisStats.lowTrueCpmRx << std::endl;
-  std::cout << "Thesis 4.3 CPM packet loss by route (%): 802.11p="
+  std::cout << "Thesis 4.3 CPM packet loss by route (%): Legacy V2V="
             << FormatThesisMetric (dsrcRouteLoss)
             << ", NR-V2X sidelink V2V=" << FormatThesisMetric (nrRouteLoss)
             << ", MEC V2N2V=" << FormatThesisMetric (mecRouteLoss)
             << std::endl;
-  std::cout << "802.11p average CBR: " << dsrcMetrics->getAverageCBROverall () << std::endl;
-  std::cout << "802.11p average PRR: " << dsrcMetrics->getAveragePRR_overall () << std::endl;
-  std::cout << "802.11p average packet loss: "
+  std::cout << "Legacy V2V average CBR: " << dsrcMetrics->getAverageCBROverall () << std::endl;
+  std::cout << "Legacy V2V average PRR: " << dsrcMetrics->getAveragePRR_overall () << std::endl;
+  std::cout << "Legacy V2V average packet loss: "
             << PacketLossFromPrr (dsrcMetrics->getAveragePRR_overall (),
                                   dsrcMetrics->getNumberTx_overall ())
             << std::endl;
-  std::cout << "802.11p TX/RX: " << dsrcMetrics->getNumberTx_overall () << "/"
+  std::cout << "Legacy V2V TX/RX: " << dsrcMetrics->getNumberTx_overall () << "/"
             << dsrcMetrics->getNumberRx_overall () << std::endl;
-  std::cout << "802.11p average latency (ms): " << dsrcMetrics->getAverageLatency_overall ()
+  std::cout << "Legacy V2V average latency (ms): " << dsrcMetrics->getAverageLatency_overall ()
             << std::endl;
   std::cout << "NR-V2X sidelink V2V average PRR: " << nrMetrics->getAveragePRR_overall ()
             << std::endl;
@@ -4355,7 +4612,7 @@ main (int argc, char* argv[])
   std::cout << "MEC uplink/forward/drop/no-receiver: " << g_mecUplinkPackets << "/"
             << g_mecForwardedPackets << "/" << g_mecForwardDrops << "/"
             << g_mecForwardNoReceiver << std::endl;
-  std::cout << "DSRC interference TX/drops/bytes: " << g_interferenceTx << "/"
+  std::cout << "NR background TX/drops/bytes: " << g_interferenceTx << "/"
             << g_interferenceDrops << "/" << g_interferenceBytes << std::endl;
 
   if (!summaryCsvPath.empty ())
