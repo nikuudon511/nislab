@@ -8,8 +8,4 @@
     <!-- V2X:STATION --><poi id="poi_3" color="orange" layer="202.00" x="1750.0" y="8.0"/>
     <!-- V2X:STATION --><poi id="poi_4" color="orange" layer="202.00" x="2250.0" y="8.0"/>
     <!-- V2X:STATION --><poi id="poi_5" color="orange" layer="202.00" x="2750.0" y="8.0"/>
-    <!-- V2X:STATION --><poi id="poi_6" color="orange" layer="202.00" x="3250.0" y="8.0"/>
-    <!-- V2X:STATION --><poi id="poi_7" color="orange" layer="202.00" x="3750.0" y="8.0"/>
-    <!-- V2X:STATION --><poi id="poi_8" color="orange" layer="202.00" x="4250.0" y="8.0"/>
-    <!-- V2X:STATION --><poi id="poi_9" color="orange" layer="202.00" x="4750.0" y="8.0"/>
 </additional>

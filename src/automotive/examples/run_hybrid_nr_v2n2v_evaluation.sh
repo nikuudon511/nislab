@@ -6,9 +6,9 @@ cd "$ROOT_DIR"
 
 SIM_TIME=${SIM_TIME:-120}
 METHODS=${METHODS:-"no-control predictive-rmr-v2v v2n2v-all-object v2n2v-high-priority-only v2n2v-adaptive-probability"}
-SUMO_FOLDER=${SUMO_FOLDER:-src/automotive/examples/sumo_files_nr_loop_1km_bidirectional/}
-MOB_TRACE=${MOB_TRACE:-cars_300_loop_bidirectional.rou.xml}
-SUMO_CONFIG=${SUMO_CONFIG:-src/automotive/examples/sumo_files_nr_loop_1km_bidirectional/map_loop_1km_bidirectional.sumo.cfg}
+SUMO_FOLDER=${SUMO_FOLDER:-src/automotive/examples/sumo_files_highway_straight/}
+MOB_TRACE=${MOB_TRACE:-cars_200_density_wave.rou.xml}
+SUMO_CONFIG=${SUMO_CONFIG:-src/automotive/examples/sumo_files_highway_straight/map_200_density_wave.sumo.cfg}
 SUMO_PORT=${SUMO_PORT:-3400}
 OUT_DIR=${OUT_DIR:-/tmp/van3twin_results/hybrid_nr_v2n2v_eval}
 
@@ -21,7 +21,8 @@ HYBRID_LOW_V2V_ALPHA=${HYBRID_LOW_V2V_ALPHA:-1}
 RMR_CBR_LOW=${RMR_CBR_LOW:-0.33}
 RMR_CBR_HIGH=${RMR_CBR_HIGH:-0.67}
 PREDICTION_HORIZON=${PREDICTION_HORIZON:-2}
-TRAFFIC_FLOW_ROAD_LENGTH=${TRAFFIC_FLOW_ROAD_LENGTH:-2000}
+TRAFFIC_FLOW_ROAD_LENGTH=${TRAFFIC_FLOW_ROAD_LENGTH:-3000}
+TRAFFIC_FLOW_TOPOLOGY=${TRAFFIC_FLOW_TOPOLOGY:-straight}
 TRAFFIC_FLOW_MESSAGE_RATE=${TRAFFIC_FLOW_MESSAGE_RATE:-10}
 TRAFFIC_FLOW_AVG_PACKET_SIZE=${TRAFFIC_FLOW_AVG_PACKET_SIZE:-500}
 TRAFFIC_FLOW_CHANNEL_RATE_MBPS=${TRAFFIC_FLOW_CHANNEL_RATE_MBPS:-6}
@@ -57,8 +58,10 @@ ORR_RANGE=${ORR_RANGE:-200}
 HIGH_PRIORITY_CPM_RECOGNITION_TTL=${HIGH_PRIORITY_CPM_RECOGNITION_TTL:-0.2}
 LOW_PRIORITY_CPM_RECOGNITION_TTL=${LOW_PRIORITY_CPM_RECOGNITION_TTL:-0.5}
 THESIS_EVAL_INTERVAL=${THESIS_EVAL_INTERVAL:-1}
-THESIS_EVAL_START_MIN_VEHICLES=${THESIS_EVAL_START_MIN_VEHICLES:-0}
+THESIS_EVAL_START_MIN_VEHICLES=${THESIS_EVAL_START_MIN_VEHICLES:-120}
 THESIS_EVAL_START_USE_ALL_VEHICLES=${THESIS_EVAL_START_USE_ALL_VEHICLES:-true}
+HOLD_TRAFFIC_UNTIL_EVAL_START=${HOLD_TRAFFIC_UNTIL_EVAL_START:-true}
+THESIS_EVAL_WARMUP_SECONDS=${THESIS_EVAL_WARMUP_SECONDS:-5}
 OBSERVATION_LOG_INTERVAL=${OBSERVATION_LOG_INTERVAL:-1}
 
 NR_BG=${NR_BG:-true}
@@ -112,7 +115,7 @@ for method in $METHODS; do
   RUN_DIR="$OUT_DIR/$method"
   mkdir -p "$RUN_DIR"
 
-  ./ns3 run "v2v-hybrid-nr-v2n2v \
+  /usr/bin/time -v -o "$RUN_DIR/resource_usage.txt" ./ns3 run "v2v-hybrid-nr-v2n2v \
     --method=$run_method \
     --sumo-gui=false \
     --sim-time=$SIM_TIME \
@@ -129,6 +132,7 @@ for method in $METHODS; do
     --rmr-cbr-high=$RMR_CBR_HIGH \
     --prediction-horizon=$PREDICTION_HORIZON \
     --traffic-flow-road-length=$TRAFFIC_FLOW_ROAD_LENGTH \
+    --traffic-flow-topology=$TRAFFIC_FLOW_TOPOLOGY \
     --traffic-flow-message-rate=$TRAFFIC_FLOW_MESSAGE_RATE \
     --traffic-flow-avg-packet-size=$TRAFFIC_FLOW_AVG_PACKET_SIZE \
     --traffic-flow-channel-rate-mbps=$TRAFFIC_FLOW_CHANNEL_RATE_MBPS \
@@ -174,6 +178,8 @@ for method in $METHODS; do
     --thesis-eval-interval=$THESIS_EVAL_INTERVAL \
     --thesis-eval-start-min-vehicles=$THESIS_EVAL_START_MIN_VEHICLES \
     --thesis-eval-start-use-all-vehicles=$THESIS_EVAL_START_USE_ALL_VEHICLES \
+    --hold-traffic-until-eval-start=$HOLD_TRAFFIC_UNTIL_EVAL_START \
+    --thesis-eval-warmup-seconds=$THESIS_EVAL_WARMUP_SECONDS \
     --observation-log-interval=$OBSERVATION_LOG_INTERVAL \
     --cbr-log=$RUN_DIR/channel.csv \
     --route-log=$RUN_DIR/route.csv \

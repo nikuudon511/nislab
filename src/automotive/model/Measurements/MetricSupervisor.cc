@@ -22,6 +22,9 @@
 
 #include "MetricSupervisor.h"
 #include "ns3/csv-utils.h"
+#include "ns3/nr-spectrum-phy.h"
+#include "ns3/nr-ue-net-device.h"
+#include "ns3/nr-ue-phy.h"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -535,25 +538,16 @@ storeCBR80211p (std::string context, Time start, Time duration, WifiPhyState sta
 }
 
 void
-storeCBRNr(std::string context, Time duration)
+storeCBRNrForNode (std::string node, Time duration)
 {
-  // In this case Duration is the time the channel will be in a busy state (referred to the future)
-  std::size_t first = context.find ("/NodeList/") + 10; // 10 is the length of "/NodeList/"
-  std::size_t last = context.find ("/", first);
-  std::string node = context.substr (first, last - first);
-
-  // How long the state will last for the other nodes?
-  // This management will be useful when the CheckCBR function will start (see below)
-  for (auto it = nodeDurationStateNr.begin(); it != nodeDurationStateNr.end(); ++it)
+  const Time now = Simulator::Now ();
+  const Time previousEnd = std::max (nodeDurationStateNr[node], now);
+  const Time newEnd = now + duration;
+  if (newEnd > previousEnd)
     {
-      if (it->first != node) nodeDurationStateNr[it->first] = Simulator::Now() + duration;
+      currentBusyCBR[node] += newEnd - previousEnd;
+      nodeDurationStateNr[node] = newEnd;
     }
-
-  for (auto it = currentBusyCBR.begin(); it != currentBusyCBR.end(); ++it)
-    {
-      if (it->first != node) it->second += duration;
-    }
-
 }
 
 void
@@ -602,7 +596,8 @@ MetricSupervisor::checkCBR ()
                 }
             }
 
-          double currentCbr = busyCbr.GetDouble () / (m_cbr_window * 1e6);
+          double currentCbr =
+              std::clamp (busyCbr.GetDouble () / (m_cbr_window * 1e6), 0.0, 1.0);
           if (false) std::cout << Simulator::Now().GetSeconds() << "s - Node " << node_id << " - CBR: " << 100 * currentCbr << std::endl;
 
           if (m_average_cbr.find (item) != m_average_cbr.end ())
@@ -793,11 +788,28 @@ MetricSupervisor::startCheckCBR (int num_nodes)
         }
       else if (m_channel_technology == "Nr")
         {
-          oss << "/NodeList/" << node->GetId() << "/DeviceList/*/$ns3::NrUeNetDevice/ComponentCarrierMapUe/*/NrUePhy/NrSpectrumPhyList/*/ChannelOccupied";
-          std::string var = oss.str();
-          Config::Connect(var, MakeCallback(&storeCBRNr));
-          currentBusyCBR[std::to_string (node->GetId())] = Time(0);
-          nodeDurationStateNr[std::to_string (node->GetId())] = Time(0);
+          const std::string nodeId = std::to_string (node->GetId ());
+          currentBusyCBR[nodeId] = Time (0);
+          nodeDurationStateNr[nodeId] = Time (0);
+          for (uint32_t deviceIndex = 0; deviceIndex < node->GetNDevices (); ++deviceIndex)
+            {
+              Ptr<NrUeNetDevice> ueDevice =
+                  DynamicCast<NrUeNetDevice> (node->GetDevice (deviceIndex));
+              if (ueDevice == nullptr)
+                {
+                  continue;
+                }
+              for (uint32_t bwpIndex = 0; bwpIndex < ueDevice->GetCcMapSize (); ++bwpIndex)
+                {
+                  Ptr<NrUePhy> phy = ueDevice->GetPhy (bwpIndex);
+                  for (uint8_t stream = 0; stream < phy->GetNumberOfStreams (); ++stream)
+                    {
+                      phy->GetSpectrumPhy (stream)->TraceConnectWithoutContext (
+                          "ChannelOccupied",
+                          MakeBoundCallback (&storeCBRNrForNode, nodeId));
+                    }
+                }
+            }
         }
     }
 
