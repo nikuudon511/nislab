@@ -163,6 +163,17 @@ struct IdealMecLoopIndexEntry
   std::size_t vehicleIndex = 0;
 };
 
+struct SensorExternalEventState
+{
+  bool triggered = false;
+  bool recognized = false;
+  bool completed = false;
+  bool hasPreviousSample = false;
+  double previousDistanceMeters = 0.0;
+  Time previousSampleTime = Seconds (0.0);
+  Time triggerTime = Seconds (0.0);
+};
+
 struct PredictiveCbrState
 {
   bool initialized = false;
@@ -191,6 +202,9 @@ struct TrafficFlowPredictionState
   double futureVehicleCountAvg = 0.0;
   double rsuPredictedCbrAvg = 0.0;
   double rsuPredictedCbrMax = 0.0;
+  uint32_t i2vVehicleCount = 0;
+  double i2vPredictedCbrAvg = 0.0;
+  double i2vPredictionLeadTimeAvg = 0.0;
 };
 
 struct TrafficFlowRsuInfo
@@ -198,6 +212,15 @@ struct TrafficFlowRsuInfo
   std::string id;
   double x = 0.0;
   double y = 0.0;
+};
+
+struct TrafficFlowRsuPrediction
+{
+  double measuredCbr = 0.0;
+  double predictedCbr = 0.0;
+  double peakTimeSeconds = 0.0;
+  uint32_t localVehicles = 0;
+  double futureVehicles = 0.0;
 };
 
 struct TrafficFlowVehicleSnapshot
@@ -219,6 +242,20 @@ struct TrafficFlowSegmentStats
   double observedCpmSizeBytes = 0.0;
 };
 
+struct MovingBackgroundConfig
+{
+  uint32_t packetSize = 0;
+  Time packetInterval = Seconds (0.0);
+  Time stopTime = Seconds (0.0);
+  bool enabled = false;
+  double periodSeconds = 20.0;
+  double amplitude = 0.8;
+  double speedMps = 25.0;
+  double minFactor = 0.2;
+  double widthMeters = 500.0;
+  double roadLengthMeters = 3000.0;
+};
+
 struct PriorityMotionState
 {
   Vector position;
@@ -227,7 +264,7 @@ struct PriorityMotionState
 
 struct PredictiveRmrConfig
 {
-  double predictionHorizonSeconds = 2.0;
+  double predictionHorizonSeconds = 20.0;
   double cpmSizeNormBytes = 1200.0;
   double cpmTxRateNorm = 10.0;
   double activeVehicleNorm = 100.0;
@@ -238,6 +275,7 @@ struct PredictiveRmrConfig
   double rsuPassivePdrLowCbr = 0.95;
   double rsuPassivePdrMidCbr = 0.90;
   double rsuPassiveSaturationCbr = 0.90;
+  double rsuI2vRangeMeters = 300.0;
   double cpmSizeWeight = 0.0;
   double cpmTxRateWeight = 0.0;
   double activeVehicleWeight = 0.0;
@@ -263,8 +301,12 @@ static TrafficFlowPredictionState g_trafficFlowPrediction;
 static PredictiveRmrConfig g_predictiveRmrConfig;
 static HybridRouteConfig g_hybridRouteConfig;
 static std::vector<TrafficFlowRsuInfo> g_trafficFlowRsus;
+static std::unordered_map<std::string, TrafficFlowRsuPrediction>
+    g_trafficFlowRsuPredictions;
+static std::unordered_map<std::string, uint32_t> g_trafficFlowRsuI2vCounts;
 static std::ofstream g_routeLog;
 static std::ofstream g_observationLog;
+static std::ofstream g_rsuPredictionLog;
 static ThesisEvaluationStats g_thesisStats;
 static uint32_t g_thesisEvalStartMinVehicles = 0;
 static bool g_thesisEvalStartUseAllVehicles = true;
@@ -280,6 +322,8 @@ static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
     g_latestNrCpmRxByReceiver;
 static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
     g_latestMecCpmRxByReceiver;
+static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
+    g_latestActualCpmObjectRxByReceiver;
 static uint64_t g_interferenceTx = 0;
 static uint64_t g_interferenceBytes = 0;
 static uint64_t g_interferenceDrops = 0;
@@ -329,6 +373,22 @@ static uint32_t g_maxCommunicationVehicles = 0;
 static uint32_t g_communicationVehicleCount = 0;
 static double g_idealMecDownlinkPdr = 1.0;
 static Ptr<UniformRandomVariable> g_idealMecDownlinkRandom;
+static bool g_sensorExternalEventsEnabled = false;
+static double g_sensorExternalEventProbability = 0.20;
+static double g_sensorExternalEventActivationRangeMeters = 400.0;
+static std::unordered_set<uint64_t> g_nonCavStationIds;
+static std::unordered_map<uint64_t, SensorExternalEventState> g_sensorExternalEvents;
+static uint64_t g_sensorExternalEventCount = 0;
+static uint64_t g_sensorExternalEventRecognized = 0;
+static uint64_t g_sensorExternalEventMissed = 0;
+static uint64_t g_sensorExternalEventCandidateVehicles = 0;
+static uint64_t g_sensorExternalEventSelectedVehicles = 0;
+static std::unordered_set<uint64_t> g_sensorExternalEventCandidateVehicleIds;
+static std::unordered_set<uint64_t> g_sensorExternalEventSelectedVehicleIds;
+static std::unordered_set<uint64_t> g_sensorExternalEventActivatedVehicleIds;
+static std::unordered_map<uint64_t, Time> g_sensorExternalEventActivationTimes;
+static std::unordered_map<uint64_t, Time> g_sensorExternalEventEndTimes;
+static std::vector<double> g_sensorExternalEventDelaysMs;
 
 static double ComputePredictiveRmrActionProbability (double predictedCbr);
 static void SetRmrActionProbability (VehicleRuntime& runtime, double probability);
@@ -531,6 +591,10 @@ ReceiveCPM (asn1cpp::Seq<CollectivePerceptionMessage> cpm,
                   const long objectId = asn1cpp::getField (object->objectId, long);
                   if (objectId > 0 && static_cast<uint64_t> (objectId) != receiverStationId)
                     {
+                      g_latestCpmRxByReceiver[receiverStationId]
+                                                   [static_cast<uint64_t> (objectId)] = now;
+                      g_latestActualCpmObjectRxByReceiver[receiverStationId]
+                                                          [static_cast<uint64_t> (objectId)] = now;
                       (*routeUpdates)[receiverStationId][static_cast<uint64_t> (objectId)] = now;
                     }
                 }
@@ -932,6 +996,35 @@ DeliverIdealMecCpmBatch (uint64_t senderStationId,
           continue;
         }
       MarkCpmObjectsRecognizedByReceiver (receiverStationId, senderStationId, now);
+      g_latestActualCpmObjectRxByReceiver[receiverStationId][senderStationId] = now;
+      const auto senderVehicleIt = g_vehicleIdByStationId.find (senderStationId);
+      if (senderVehicleIt != g_vehicleIdByStationId.end ())
+        {
+          const auto senderNodeIt = g_allVehicleNodes.find (senderVehicleIt->second);
+          Ptr<MobilityModel> senderMobility =
+              senderNodeIt != g_allVehicleNodes.end () && senderNodeIt->second != nullptr
+                  ? senderNodeIt->second->GetObject<MobilityModel> ()
+                  : nullptr;
+          if (senderMobility != nullptr)
+            {
+              for (const auto& objectEntry : g_allVehicleNodes)
+                {
+                  if (objectEntry.second == nullptr)
+                    {
+                      continue;
+                    }
+                  const uint64_t objectStationId = VehicleIdToStationId (objectEntry.first);
+                  Ptr<MobilityModel> objectMobility =
+                      objectEntry.second->GetObject<MobilityModel> ();
+                  if (objectStationId != receiverStationId && objectMobility != nullptr &&
+                      senderMobility->GetDistanceFrom (objectMobility) <= g_sensorRangeMeters)
+                    {
+                      g_latestActualCpmObjectRxByReceiver[receiverStationId][objectStationId] =
+                          now;
+                    }
+                }
+            }
+        }
       g_latestMecCpmRxByReceiver[receiverStationId][senderStationId] = now;
       ++g_idealMecRx;
       if (receiver.second)
@@ -1181,6 +1274,244 @@ IsClosingHighPriorityObject (uint64_t egoStationId,
 
   const double ttcSeconds = distanceMeters / closingSpeed;
   return ttcSeconds <= g_priorityTtcThresholdSeconds;
+}
+
+static double
+StableEventProbability (uint64_t egoStationId, uint64_t objectStationId)
+{
+  uint64_t value = egoStationId * 0x9e3779b97f4a7c15ULL;
+  value ^= objectStationId + 0xbf58476d1ce4e5b9ULL + (value << 6) + (value >> 2);
+  value ^= value >> 30;
+  value *= 0xbf58476d1ce4e5b9ULL;
+  value ^= value >> 27;
+  value *= 0x94d049bb133111ebULL;
+  value ^= value >> 31;
+  return static_cast<double> (value >> 11) / static_cast<double> (1ULL << 53);
+}
+
+static void
+RestoreSensorExternalEventVehicle (std::string vehicleId)
+{
+  if (g_sumoClient == nullptr || g_allVehicleNodes.find (vehicleId) == g_allVehicleNodes.end ())
+    {
+      return;
+    }
+  try
+    {
+      g_sumoClient->TraCIAPI::vehicle.setMaxSpeed (vehicleId, 27.78);
+      g_sumoClient->TraCIAPI::vehicle.setSpeed (vehicleId, -1.0);
+    }
+  catch (...)
+    {
+    }
+}
+
+static void
+MonitorSensorExternalEvents ()
+{
+  if (!g_sensorExternalEventsEnabled || g_sumoClient == nullptr)
+    {
+      return;
+    }
+
+  const Time now = Simulator::Now ();
+  const bool evaluationActive =
+      (!g_holdTrafficUntilEvaluationStart || g_trafficReleased) &&
+      now >= g_thesisEvaluationStartTime;
+  if (evaluationActive)
+    {
+      for (const uint64_t objectId : g_nonCavStationIds)
+        {
+          if (g_sensorExternalEventCandidateVehicleIds.insert (objectId).second)
+            {
+              ++g_sensorExternalEventCandidateVehicles;
+              const double draw = StableEventProbability (0, objectId);
+              if (draw <= g_sensorExternalEventProbability)
+                {
+                  g_sensorExternalEventSelectedVehicleIds.insert (objectId);
+                  ++g_sensorExternalEventSelectedVehicles;
+                  const double normalized =
+                      g_sensorExternalEventProbability > 0.0
+                          ? draw / g_sensorExternalEventProbability
+                          : 0.0;
+                  g_sensorExternalEventActivationTimes[objectId] =
+                      g_thesisEvaluationStartTime + Seconds (1.0 + 10.0 * normalized);
+                }
+            }
+
+          const auto activationIt = g_sensorExternalEventActivationTimes.find (objectId);
+          if (activationIt == g_sensorExternalEventActivationTimes.end () ||
+              now < activationIt->second ||
+              g_sensorExternalEventActivatedVehicleIds.count (objectId) > 0)
+            {
+              continue;
+            }
+          const auto vehicleIt = g_vehicleIdByStationId.find (objectId);
+          if (vehicleIt == g_vehicleIdByStationId.end ())
+            {
+              continue;
+            }
+          const auto objectNodeIt = g_allVehicleNodes.find (vehicleIt->second);
+          if (objectNodeIt == g_allVehicleNodes.end () || objectNodeIt->second == nullptr)
+            {
+              continue;
+            }
+          Ptr<MobilityModel> objectMobility =
+              objectNodeIt->second->GetObject<MobilityModel> ();
+          bool cavInActivationRange = false;
+          if (objectMobility != nullptr)
+            {
+              for (const auto& egoEntry : g_vehicleRuntime)
+                {
+                  const auto egoNodeIt = g_allVehicleNodes.find (egoEntry.first);
+                  if (egoNodeIt == g_allVehicleNodes.end () || egoNodeIt->second == nullptr)
+                    {
+                      continue;
+                    }
+                  Ptr<MobilityModel> egoMobility =
+                      egoNodeIt->second->GetObject<MobilityModel> ();
+                  if (egoMobility != nullptr &&
+                      egoMobility->GetDistanceFrom (objectMobility) <=
+                          g_sensorExternalEventActivationRangeMeters)
+                    {
+                      cavInActivationRange = true;
+                      break;
+                    }
+                }
+            }
+          if (!cavInActivationRange)
+            {
+              continue;
+            }
+          g_sensorExternalEventActivatedVehicleIds.insert (objectId);
+          g_sensorExternalEventEndTimes[objectId] = now + Seconds (5.0);
+          try
+            {
+              g_sumoClient->TraCIAPI::vehicle.setMaxSpeed (vehicleIt->second, 33.33);
+              g_sumoClient->TraCIAPI::vehicle.setSpeed (vehicleIt->second, 33.33);
+              Simulator::Schedule (Seconds (5.0),
+                                   &RestoreSensorExternalEventVehicle,
+                                   vehicleIt->second);
+            }
+          catch (...)
+            {
+            }
+        }
+
+      for (const auto& egoEntry : g_vehicleRuntime)
+        {
+          const uint64_t egoId = VehicleIdToStationId (egoEntry.first);
+          const auto egoNodeIt = g_allVehicleNodes.find (egoEntry.first);
+          if (egoNodeIt == g_allVehicleNodes.end () || egoNodeIt->second == nullptr)
+            {
+              continue;
+            }
+          Ptr<MobilityModel> egoMobility = egoNodeIt->second->GetObject<MobilityModel> ();
+          if (egoMobility == nullptr)
+            {
+              continue;
+            }
+
+          for (const uint64_t objectId : g_nonCavStationIds)
+            {
+              const auto objectVehicleIt = g_vehicleIdByStationId.find (objectId);
+              if (objectVehicleIt == g_vehicleIdByStationId.end ())
+                {
+                  continue;
+                }
+              const auto objectNodeIt = g_allVehicleNodes.find (objectVehicleIt->second);
+              if (objectNodeIt == g_allVehicleNodes.end () || objectNodeIt->second == nullptr)
+                {
+                  continue;
+                }
+              Ptr<MobilityModel> objectMobility =
+                  objectNodeIt->second->GetObject<MobilityModel> ();
+              if (objectMobility == nullptr)
+                {
+                  continue;
+                }
+
+              const double distance = egoMobility->GetDistanceFrom (objectMobility);
+              const uint64_t key = (egoId << 32) ^ objectId;
+              const auto eventEndIt = g_sensorExternalEventEndTimes.find (objectId);
+              if (eventEndIt == g_sensorExternalEventEndTimes.end () ||
+                  now > eventEndIt->second)
+                {
+                  continue;
+                }
+              auto stateIt = g_sensorExternalEvents.find (key);
+              if (stateIt == g_sensorExternalEvents.end ())
+                {
+                  stateIt = g_sensorExternalEvents.emplace (key, SensorExternalEventState {}).first;
+                }
+
+              SensorExternalEventState& state = stateIt->second;
+              if (state.completed)
+                {
+                  continue;
+                }
+
+              double closingSpeed = 0.0;
+              if (state.hasPreviousSample)
+                {
+                  const double dt = (now - state.previousSampleTime).GetSeconds ();
+                  if (dt > 0.0)
+                    {
+                      closingSpeed = (state.previousDistanceMeters - distance) / dt;
+                    }
+                }
+              state.hasPreviousSample = true;
+              state.previousDistanceMeters = distance;
+              state.previousSampleTime = now;
+              const double ttc =
+                  closingSpeed > 0.0 ? distance / closingSpeed
+                                     : std::numeric_limits<double>::infinity ();
+
+              if (!state.triggered && distance > g_sensorRangeMeters &&
+                  distance <= g_orrRangeMeters &&
+                  closingSpeed >= g_priorityClosingSpeedThresholdMps &&
+                  ttc <= g_priorityTtcThresholdSeconds)
+                {
+                  state.triggered = true;
+                  state.triggerTime = now;
+                  ++g_sensorExternalEventCount;
+                }
+              if (!state.triggered)
+                {
+                  continue;
+                }
+
+              const auto receiverIt = g_latestActualCpmObjectRxByReceiver.find (egoId);
+              const auto updateIt =
+                  receiverIt != g_latestActualCpmObjectRxByReceiver.end ()
+                      ? receiverIt->second.find (objectId)
+                      : std::unordered_map<uint64_t, Time>::const_iterator ();
+              if (receiverIt != g_latestActualCpmObjectRxByReceiver.end () &&
+                  updateIt != receiverIt->second.end () &&
+                  updateIt->second >= state.triggerTime &&
+                  (now - updateIt->second).GetSeconds () <=
+                      g_highPriorityCpmRecognitionTtlSeconds)
+                {
+                  state.recognized = true;
+                  state.completed = true;
+                  ++g_sensorExternalEventRecognized;
+                  g_sensorExternalEventDelaysMs.push_back (
+                      std::max (
+                          0.0,
+                          static_cast<double> (
+                              (now - state.triggerTime).GetMilliSeconds ())));
+                }
+              else if ((now - state.triggerTime).GetSeconds () >
+                       g_highPriorityCpmRecognitionTtlSeconds)
+                {
+                  state.completed = true;
+                  ++g_sensorExternalEventMissed;
+                }
+            }
+        }
+    }
+
+  Simulator::Schedule (MilliSeconds (100), &MonitorSensorExternalEvents);
 }
 
 static bool
@@ -2097,6 +2428,41 @@ ComputeTrafficFlowRate (double vehicleCount, double speedMps, double segmentLeng
   return (vehicleCount / std::max (segmentLengthM, 1.0)) * std::max (0.0, speedMps);
 }
 
+static double
+PredictStraightSegmentPeakVehicles (
+    const std::vector<TrafficFlowVehicleSnapshot>& vehicles,
+    double segmentStartM,
+    double segmentEndM,
+    double horizonSeconds,
+    double* peakTimeSeconds)
+{
+  uint32_t peakVehicles = 0;
+  const double stepSeconds = 1.0;
+  for (double offset = 0.0; offset <= horizonSeconds; offset += stepSeconds)
+    {
+      uint32_t projectedVehicles = 0;
+      for (const auto& vehicle : vehicles)
+        {
+          const double projectedPosition =
+              vehicle.loopPositionMeters +
+              static_cast<double> (vehicle.direction) * vehicle.speedMps * offset;
+          if (projectedPosition >= segmentStartM && projectedPosition < segmentEndM)
+            {
+              ++projectedVehicles;
+            }
+        }
+      if (projectedVehicles > peakVehicles)
+        {
+          peakVehicles = projectedVehicles;
+          if (peakTimeSeconds != nullptr)
+            {
+              *peakTimeSeconds = offset;
+            }
+        }
+    }
+  return static_cast<double> (peakVehicles);
+}
+
 static bool
 UpdateRsuSharedTrafficFlowPrediction (double packetSizeBits,
                                       Ptr<MetricSupervisor> channelMetrics)
@@ -2126,6 +2492,7 @@ UpdateRsuSharedTrafficFlowPrediction (double packetSizeBits,
   double predictedCbrSum = 0.0;
   double predictedCbrMax = 0.0;
   uint32_t metricCount = 0;
+  g_trafficFlowRsuPredictions.clear ();
 
   for (const auto& rsu : g_trafficFlowRsus)
     {
@@ -2169,8 +2536,20 @@ UpdateRsuSharedTrafficFlowPrediction (double packetSizeBits,
       const double qOut =
           ComputeTrafficFlowRate (localCw.vehicleCount, localCw.averageSpeedMps, segmentLengthM) +
           ComputeTrafficFlowRate (localCcw.vehicleCount, localCcw.averageSpeedMps, segmentLengthM);
+      double peakTimeSeconds = horizonSeconds;
       const double futureVehicles =
-          std::max (0.0, static_cast<double> (local.vehicleCount) + (qIn - qOut) * horizonSeconds);
+          g_trafficFlowIsLoop
+              ? std::max (0.0,
+                          static_cast<double> (local.vehicleCount) +
+                              (qIn - qOut) * horizonSeconds)
+              : PredictStraightSegmentPeakVehicles (vehicles,
+                                                    std::max (0.0, localStart),
+                                                    std::min (
+                                                        g_predictiveRmrConfig
+                                                            .trafficFlowRoadLengthMeters,
+                                                        localEnd),
+                                                    horizonSeconds,
+                                                    &peakTimeSeconds);
       const double upstreamObservedCpmSizeBytes =
           (upstreamCw.observedCpmSizeBytes + upstreamCcw.observedCpmSizeBytes) / 2.0;
       const double upstreamObservedCpmTxRateHz =
@@ -2215,6 +2594,12 @@ UpdateRsuSharedTrafficFlowPrediction (double packetSizeBits,
               ? 1.0
               : Clamp01 (std::max (measuredLocalCbr, currentTrafficCbr) +
                          trafficFlowIncrease);
+      g_trafficFlowRsuPredictions[rsu.id] = {
+          measuredLocalCbr,
+          predictedCbr,
+          peakTimeSeconds,
+          local.vehicleCount,
+          futureVehicles};
 
       qInSum += qIn;
       qOutSum += qOut;
@@ -2348,7 +2733,8 @@ OpenObservationLog (const std::string& path)
       << "ttl_violation_rate,never_received_rate,"
       << "high_ttl_violation_rate,high_never_received_rate,"
       << "low_ttl_violation_rate,low_never_received_rate,"
-      << "active_all_vehicles" << std::endl;
+      << "active_all_vehicles,rsu_i2v_vehicle_count,rsu_i2v_predicted_cbr_avg,"
+      << "rsu_i2v_prediction_lead_time_avg" << std::endl;
 }
 
 static void
@@ -2578,7 +2964,10 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << FormatThesisMetric (highNeverReceivedRate) << ","
                        << FormatThesisMetric (lowTtlViolationRate) << ","
                        << FormatThesisMetric (lowNeverReceivedRate) << ","
-                       << g_allVehicleNodes.size () << std::endl;
+                       << g_allVehicleNodes.size () << ","
+                       << g_trafficFlowPrediction.i2vVehicleCount << ","
+                       << g_trafficFlowPrediction.i2vPredictedCbrAvg << ","
+                       << g_trafficFlowPrediction.i2vPredictionLeadTimeAvg << std::endl;
     }
 
   Simulator::Schedule (interval,
@@ -2611,6 +3000,57 @@ UpdateReactiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
   Simulator::Schedule (interval, &UpdateReactiveRmrCbr, channelMetrics, interval);
 }
 
+static bool
+GetVehicleRsuPrediction (const std::string& vehicleId,
+                         double* predictedCbr,
+                         double* peakTimeSeconds)
+{
+  if (g_sumoClient == nullptr || g_trafficFlowRsus.empty ())
+    {
+      return false;
+    }
+  try
+    {
+      const libsumo::TraCIPosition position =
+          g_sumoClient->TraCIAPI::vehicle.getPosition (vehicleId);
+      const std::string roadId = g_sumoClient->TraCIAPI::vehicle.getRoadID (vehicleId);
+      const int direction =
+          roadId.rfind ("highway_wb", 0) == 0 || roadId.rfind ("loop_r", 0) == 0 ? -1 : 1;
+      const TrafficFlowRsuInfo* selected = nullptr;
+      double selectedDistance = std::numeric_limits<double>::infinity ();
+      for (const auto& rsu : g_trafficFlowRsus)
+        {
+          const double signedDistance = (rsu.x - position.x) * direction;
+          const double distance = std::abs (rsu.x - position.x);
+          if (signedDistance < 0.0 ||
+              distance > g_predictiveRmrConfig.rsuI2vRangeMeters ||
+              distance >= selectedDistance)
+            {
+              continue;
+            }
+          selected = &rsu;
+          selectedDistance = distance;
+        }
+      if (selected == nullptr)
+        {
+          return false;
+        }
+      const auto predictionIt = g_trafficFlowRsuPredictions.find (selected->id);
+      if (predictionIt == g_trafficFlowRsuPredictions.end ())
+        {
+          return false;
+        }
+      *predictedCbr = predictionIt->second.predictedCbr;
+      *peakTimeSeconds = predictionIt->second.peakTimeSeconds;
+      ++g_trafficFlowRsuI2vCounts[selected->id];
+      return true;
+    }
+  catch (...)
+    {
+      return false;
+    }
+}
+
 static void
 UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
 {
@@ -2621,6 +3061,10 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
           ? static_cast<double> (g_vehicleRuntime.size ()) /
                 g_predictiveRmrConfig.activeVehicleNorm
           : 0.0;
+  uint32_t i2vPredictionCount = 0;
+  double i2vPredictionSum = 0.0;
+  double i2vLeadTimeSum = 0.0;
+  g_trafficFlowRsuI2vCounts.clear ();
 
   for (auto& entry : g_vehicleRuntime)
     {
@@ -2662,7 +3106,16 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
               ? state.dsrcCpmTxRate / g_predictiveRmrConfig.cpmTxRateNorm
               : 0.0;
 
-      const double trafficFlowCbr = g_trafficFlowPrediction.trafficFlowCbr;
+      double trafficFlowCbr = currentCbr;
+      double predictionLeadTimeSeconds = 0.0;
+      if (GetVehicleRsuPrediction (vehicleId,
+                                   &trafficFlowCbr,
+                                   &predictionLeadTimeSeconds))
+        {
+          ++i2vPredictionCount;
+          i2vPredictionSum += trafficFlowCbr;
+          i2vLeadTimeSum += predictionLeadTimeSeconds;
+        }
       const double predictedCbr =
           Clamp01 (std::max (currentCbr, trafficFlowCbr) +
                    (g_predictiveRmrConfig.cpmSizeWeight * cpmSizeFeature) +
@@ -2687,6 +3140,31 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
           entry.second.mecContainer->getCPBasicService ()->setRmrCurrentCbr (predictedCbr);
         }
     }
+  g_trafficFlowPrediction.i2vVehicleCount = i2vPredictionCount;
+  g_trafficFlowPrediction.i2vPredictedCbrAvg =
+      i2vPredictionCount > 0 ? i2vPredictionSum / i2vPredictionCount : 0.0;
+  g_trafficFlowPrediction.i2vPredictionLeadTimeAvg =
+      i2vPredictionCount > 0 ? i2vLeadTimeSum / i2vPredictionCount : 0.0;
+  if (g_rsuPredictionLog.is_open ())
+    {
+      for (const auto& rsu : g_trafficFlowRsus)
+        {
+          const auto predictionIt = g_trafficFlowRsuPredictions.find (rsu.id);
+          if (predictionIt == g_trafficFlowRsuPredictions.end ())
+            {
+              continue;
+            }
+          const auto countIt = g_trafficFlowRsuI2vCounts.find (rsu.id);
+          const uint32_t i2vVehicles =
+              countIt != g_trafficFlowRsuI2vCounts.end () ? countIt->second : 0;
+          const auto& prediction = predictionIt->second;
+          g_rsuPredictionLog
+              << now.GetSeconds () << "," << rsu.id << "," << rsu.x << "," << rsu.y << ","
+              << prediction.measuredCbr << "," << prediction.predictedCbr << ","
+              << prediction.peakTimeSeconds << "," << prediction.localVehicles << ","
+              << prediction.futureVehicles << "," << i2vVehicles << std::endl;
+        }
+    }
 
   Simulator::Schedule (interval,
                        &UpdatePredictiveRmrCbr,
@@ -2696,33 +3174,54 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
 
 static void
 GenerateDsrcInterference (Ptr<Socket> socket,
-                          uint32_t pktSize,
-                          Time pktInterval,
-                          Time stopTime)
+                          std::string sourceVehicleId,
+                          MovingBackgroundConfig config)
 {
-  if (Simulator::Now () >= stopTime)
+  if (Simulator::Now () >= config.stopTime)
     {
       socket->Close ();
       return;
     }
 
-  const int sent = socket->Send (Create<Packet> (pktSize));
+  double factor = 1.0;
+  if (config.enabled && g_sumoClient != nullptr)
+    {
+      try
+        {
+          const double x = g_sumoClient->TraCIAPI::vehicle.getPosition (sourceVehicleId).x;
+          const double roadLength = std::max (config.roadLengthMeters, 1.0);
+          const double center =
+              std::fmod (config.speedMps * Simulator::Now ().GetSeconds (), roadLength);
+          const double directDistance = std::abs (x - center);
+          const double wrappedDistance = roadLength - directDistance;
+          const double distance = std::min (directDistance, wrappedDistance);
+          factor = distance <= config.widthMeters / 2.0
+                       ? 1.0 + config.amplitude
+                       : config.minFactor;
+        }
+      catch (...)
+        {
+        }
+    }
+  const uint32_t currentPktSize =
+      std::max (1u,
+                static_cast<uint32_t> (std::lround (config.packetSize * factor)));
+  const int sent = socket->Send (Create<Packet> (currentPktSize));
   if (sent >= 0)
     {
       ++g_interferenceTx;
-      g_interferenceBytes += pktSize;
+      g_interferenceBytes += currentPktSize;
     }
   else
     {
       ++g_interferenceDrops;
     }
 
-  Simulator::Schedule (pktInterval,
+  Simulator::Schedule (config.packetInterval,
                        &GenerateDsrcInterference,
                        socket,
-                       pktSize,
-                       pktInterval,
-                       stopTime);
+                       sourceVehicleId,
+                       config);
 }
 
 static void
@@ -3178,6 +3677,7 @@ main (int argc, char* argv[])
   bool enableRouteControl = true;
   bool enablePcap = false;
   bool enableDsrcInterference = false;
+  bool nrBgMovingWave = false;
   bool enableNrSensing = false;
   bool enableChannelRandomness = false;
   bool enableReactiveRmr = false;
@@ -3214,6 +3714,11 @@ main (int argc, char* argv[])
   uint32_t dsrcInterferenceSourceVehicle = 3;
   uint32_t dsrcInterferenceNodeCount = 6;
   bool dsrcInterferencePerVehicle = false;
+  double nrBgWavePeriodSeconds = 20.0;
+  double nrBgWaveAmplitude = 0.8;
+  double nrBgWaveSpeedMps = 25.0;
+  double nrBgWaveMinFactor = 0.2;
+  double nrBgWaveWidthMeters = 500.0;
   double rmrCbrLow = 0.33;
   double rmrCbrHigh = 0.67;
   double rmrWeightFrequency = 1.0;
@@ -3223,7 +3728,7 @@ main (int argc, char* argv[])
   uint32_t rmrDeleteMiddle = 20;
   uint32_t rmrDeleteHigh = 40;
   uint32_t rmrWindowMs = 1000;
-  double predictionHorizonSeconds = 2.0;
+  double predictionHorizonSeconds = 20.0;
   double predictorCpmSizeNormBytes = 1200.0;
   double predictorCpmTxRateNorm = 10.0;
   double predictorActiveVehicleNorm = 100.0;
@@ -3235,6 +3740,7 @@ main (int argc, char* argv[])
   double rsuPassivePdrLowCbr = 0.95;
   double rsuPassivePdrMidCbr = 0.90;
   double rsuPassiveSaturationCbr = 0.90;
+  double rsuI2vRangeMeters = 300.0;
   double predictorCpmSizeWeight = 0.0;
   double predictorCpmTxRateWeight = 0.0;
   double predictorActiveVehicleWeight = 0.0;
@@ -3256,6 +3762,9 @@ main (int argc, char* argv[])
   double highPriorityCpmRecognitionTtlSeconds = 0.5;
   double lowPriorityCpmRecognitionTtlSeconds = 1.0;
   double orrRangeMeters = 100.0;
+  bool sensorExternalEventsEnabled = false;
+  double sensorExternalEventProbability = 0.20;
+  double sensorExternalEventActivationRangeMeters = 400.0;
   uint16_t nrSocketPort = 19;
   Time slBearersActivationTime = Seconds (2.0);
   std::string mecRsuFile = "stations.xml";
@@ -3300,6 +3809,7 @@ main (int argc, char* argv[])
   std::string routeLogPath = "hybrid-cbr-route-log.csv";
   std::string cbrLogPath = "hybrid-nr-channel-log.csv";
   std::string observationLogPath = "hybrid-observation-log.csv";
+  std::string rsuPredictionLogPath = "";
   std::string summaryCsvPath = "summary.csv";
   std::string method = "legacy";
 
@@ -3335,6 +3845,20 @@ main (int argc, char* argv[])
   cmd.AddValue ("nr-bg-start", "Background traffic start time [s]", dsrcInterferenceStart);
   cmd.AddValue ("nr-bg-stop", "Background traffic stop time [s]; 0 means sim-time", dsrcInterferenceStop);
   cmd.AddValue ("nr-bg-userpriority", "User Priority for NR background traffic", dsrcInterferenceUserPriority);
+  cmd.AddValue ("nr-bg-moving-wave",
+                "Modulate NR background packet size as a spatially moving sine wave",
+                nrBgMovingWave);
+  cmd.AddValue ("nr-bg-wave-period", "Moving background wave period [s]", nrBgWavePeriodSeconds);
+  cmd.AddValue ("nr-bg-wave-amplitude",
+                "Moving background fractional amplitude [0,1]",
+                nrBgWaveAmplitude);
+  cmd.AddValue ("nr-bg-wave-speed", "Moving background wave speed [m/s]", nrBgWaveSpeedMps);
+  cmd.AddValue ("nr-bg-wave-min-factor",
+                "Minimum moving background packet-size factor",
+                nrBgWaveMinFactor);
+  cmd.AddValue ("nr-bg-wave-width",
+                "Width [m] of the moving high-load background region",
+                nrBgWaveWidthMeters);
   cmd.AddValue ("method",
                 "Run method: legacy, no-control, reactive-rmr, predictive-rmr-v2v, predictive-rmr-v2n2v, cbr-route-nr-sidelink",
                 method);
@@ -3376,6 +3900,9 @@ main (int argc, char* argv[])
   cmd.AddValue ("rsu-passive-saturation-cbr",
                 "CBR where RSU prediction saturates to 1.0 instead of relying on passive-listening precision",
                 rsuPassiveSaturationCbr);
+  cmd.AddValue ("rsu-i2v-range",
+                "Maximum distance [m] for using the next RSU prediction",
+                rsuI2vRangeMeters);
   cmd.AddValue ("predictor-cpm-size-norm",
                 "Normalization value for the CPM size predictor feature [bytes]",
                 predictorCpmSizeNormBytes);
@@ -3448,6 +3975,15 @@ main (int argc, char* argv[])
   cmd.AddValue ("orr-range",
                 "Distance threshold [m] used by the ORR/recognition evaluation",
                 orrRangeMeters);
+  cmd.AddValue ("sensor-external-events",
+                "Enable reproducible non-CAV events outside sensor range",
+                sensorExternalEventsEnabled);
+  cmd.AddValue ("sensor-external-event-probability",
+                "Non-CAV event selection probability",
+                sensorExternalEventProbability);
+  cmd.AddValue ("sensor-external-event-activation-range",
+                "Maximum distance [m] from any CAV when a selected non-CAV event starts",
+                sensorExternalEventActivationRangeMeters);
   cmd.AddValue ("mec-rsu-file",
                 "SUMO additional POI file used as LTE eNB/RSU positions for MEC V2N2V",
                 mecRsuFile);
@@ -3504,6 +4040,9 @@ main (int argc, char* argv[])
   cmd.AddValue ("cbr-log", "CSV file for MetricSupervisor CBR values", cbrLogPath);
   cmd.AddValue ("route-log", "CSV file for route switching events", routeLogPath);
   cmd.AddValue ("observation-log", "CSV file for CBR/PRR/loss/route-count time series", observationLogPath);
+  cmd.AddValue ("rsu-prediction-log",
+                "CSV file for per-RSU measured/predicted CBR time series",
+                rsuPredictionLogPath);
   cmd.AddValue ("summary-csv", "CSV file for one-line thesis summary metrics", summaryCsvPath);
   cmd.AddValue ("observation-log-interval", "Observation CSV write interval [s]", observationLogInterval);
   cmd.AddValue ("thesis-eval-interval", "Evaluation interval for thesis 4.3 metrics [s]", thesisEvalInterval);
@@ -3619,6 +4158,15 @@ main (int argc, char* argv[])
     {
       NS_FATAL_ERROR ("orr-range must be greater than 0");
     }
+  if (sensorExternalEventProbability < 0.0 || sensorExternalEventProbability > 1.0)
+    {
+      NS_FATAL_ERROR ("sensor-external-event-probability must be in [0,1]");
+    }
+  if (sensorExternalEventActivationRangeMeters <= orrRangeMeters)
+    {
+      NS_FATAL_ERROR (
+          "sensor-external-event-activation-range must be greater than orr-range");
+    }
   if (observationLogInterval <= 0.0)
     {
       NS_FATAL_ERROR ("observation-log-interval must be greater than 0");
@@ -3644,6 +4192,12 @@ main (int argc, char* argv[])
     {
       NS_FATAL_ERROR ("dsrc-interference-size must be greater than 0");
     }
+  if (nrBgWavePeriodSeconds <= 0.0 || nrBgWaveSpeedMps <= 0.0 ||
+      nrBgWaveMinFactor <= 0.0 || nrBgWaveAmplitude < 0.0 ||
+      nrBgWaveAmplitude > 1.0 || nrBgWaveWidthMeters <= 0.0)
+    {
+      NS_FATAL_ERROR ("invalid NR moving-wave background parameters");
+    }
   if (enableDsrcInterference && !dsrcInterferencePerVehicle && dsrcInterferenceNodeCount < 2)
     {
       NS_FATAL_ERROR ("dsrc-interference-nodes must be at least 2 for unicast traffic");
@@ -3663,6 +4217,10 @@ main (int argc, char* argv[])
   if (trafficFlowRoadLengthMeters <= 0.0)
     {
       NS_FATAL_ERROR ("traffic-flow-road-length must be greater than 0");
+    }
+  if (rsuI2vRangeMeters <= 0.0)
+    {
+      NS_FATAL_ERROR ("rsu-i2v-range must be greater than 0");
     }
   if (trafficFlowTopology != "loop" && trafficFlowTopology != "straight")
     {
@@ -3756,6 +4314,7 @@ main (int argc, char* argv[])
   g_predictiveRmrConfig.rsuPassivePdrLowCbr = Clamp01 (rsuPassivePdrLowCbr);
   g_predictiveRmrConfig.rsuPassivePdrMidCbr = Clamp01 (rsuPassivePdrMidCbr);
   g_predictiveRmrConfig.rsuPassiveSaturationCbr = Clamp01 (rsuPassiveSaturationCbr);
+  g_predictiveRmrConfig.rsuI2vRangeMeters = rsuI2vRangeMeters;
   g_predictiveRmrConfig.cpmSizeWeight = predictorCpmSizeWeight;
   g_predictiveRmrConfig.cpmTxRateWeight = predictorCpmTxRateWeight;
   g_predictiveRmrConfig.activeVehicleWeight = predictorActiveVehicleWeight;
@@ -3801,6 +4360,9 @@ main (int argc, char* argv[])
   g_highPriorityCpmRecognitionTtlSeconds = highPriorityCpmRecognitionTtlSeconds;
   g_lowPriorityCpmRecognitionTtlSeconds = lowPriorityCpmRecognitionTtlSeconds;
   g_orrRangeMeters = orrRangeMeters;
+  g_sensorExternalEventsEnabled = sensorExternalEventsEnabled;
+  g_sensorExternalEventProbability = sensorExternalEventProbability;
+  g_sensorExternalEventActivationRangeMeters = sensorExternalEventActivationRangeMeters;
   g_dsrcInterferencePerVehicle = dsrcInterferencePerVehicle;
   if (enableDsrcInterference && dsrcInterferenceIntervalMs > 0.0 && dsrcDccBitRateMbps > 0.0)
     {
@@ -4437,6 +4999,17 @@ main (int argc, char* argv[])
 
   OpenRouteLog (routeLogPath);
   OpenObservationLog (observationLogPath);
+  if (!rsuPredictionLogPath.empty ())
+    {
+      g_rsuPredictionLog.open (rsuPredictionLogPath, std::ios::out);
+      if (!g_rsuPredictionLog.is_open ())
+        {
+          NS_FATAL_ERROR ("Unable to open RSU prediction log file: " << rsuPredictionLogPath);
+        }
+      g_rsuPredictionLog
+          << "time_s,rsu_id,rsu_x,rsu_y,measured_cbr,predicted_cbr,"
+          << "peak_lead_time_s,local_vehicles,future_vehicles,i2v_vehicles" << std::endl;
+    }
 
   STARTUP_FCN setupNewVehicle = [&] (std::string vehicleId,
                                      TraciClient::StationTypeTraCI_t stationType) -> Ptr<Node>
@@ -4465,6 +5038,7 @@ main (int argc, char* argv[])
       }
     if (!communicationVehicle)
       {
+        g_nonCavStationIds.insert (stationId);
         return node;
       }
     if (g_maxCommunicationVehicles > 0 && g_communicationVehicleCount >= g_maxCommunicationVehicles)
@@ -4625,6 +5199,17 @@ main (int argc, char* argv[])
         const uint32_t sourceIndex = static_cast<uint32_t> (stationId - 1);
         const Time stopTime =
             Seconds (dsrcInterferenceStop > 0.0 ? dsrcInterferenceStop : simTime);
+        const MovingBackgroundConfig backgroundConfig = {
+            dsrcInterferencePacketSize,
+            MilliSeconds (dsrcInterferenceIntervalMs),
+            stopTime,
+            nrBgMovingWave,
+            nrBgWavePeriodSeconds,
+            nrBgWaveAmplitude,
+            nrBgWaveSpeedMps,
+            nrBgWaveMinFactor,
+            nrBgWaveWidthMeters,
+            trafficFlowRoadLengthMeters};
         const double phaseStepMs =
             dsrcInterferenceIntervalMs /
             static_cast<double> (dsrcInterferencePerVehicle ? numberOfNodes
@@ -4634,9 +5219,8 @@ main (int argc, char* argv[])
                                             MilliSeconds (phaseStepMs * sourceIndex),
                                         &GenerateDsrcInterference,
                                         dsrcInterferenceSockets[sourceIndex],
-                                        dsrcInterferencePacketSize,
-                                        MilliSeconds (dsrcInterferenceIntervalMs),
-                                        stopTime);
+                                        vehicleId,
+                                        backgroundConfig);
       }
     return node;
   };
@@ -4649,10 +5233,12 @@ main (int argc, char* argv[])
     const uint64_t stationId = VehicleIdToStationId (vehicleId);
     g_allVehicleNodes.erase (vehicleId);
     g_vehicleIdByStationId.erase (stationId);
+    g_nonCavStationIds.erase (stationId);
     g_priorityMotionHistory.erase (stationId);
     g_latestCpmRxByReceiver.erase (stationId);
     g_latestNrCpmRxByReceiver.erase (stationId);
     g_latestMecCpmRxByReceiver.erase (stationId);
+    g_latestActualCpmObjectRxByReceiver.erase (stationId);
     for (auto& entry : g_latestCpmRxByReceiver)
       {
         entry.second.erase (stationId);
@@ -4662,6 +5248,10 @@ main (int argc, char* argv[])
         entry.second.erase (stationId);
       }
     for (auto& entry : g_latestMecCpmRxByReceiver)
+      {
+        entry.second.erase (stationId);
+      }
+    for (auto& entry : g_latestActualCpmObjectRxByReceiver)
       {
         entry.second.erase (stationId);
       }
@@ -4745,6 +5335,10 @@ main (int argc, char* argv[])
                        sumoClient,
                        baselinePrR,
                        Seconds (thesisEvalInterval));
+  if (g_sensorExternalEventsEnabled)
+    {
+      Simulator::Schedule (MilliSeconds (100), &MonitorSensorExternalEvents);
+    }
 
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
@@ -4816,6 +5410,28 @@ main (int argc, char* argv[])
   const double lowNeverReceivedRate =
       PercentFromRatioSum (g_thesisStats.lowPriorityNeverReceivedRatioSum,
                            g_thesisStats.lowPriorityNeverReceivedVehicleSamples);
+  const uint64_t sensorExternalEventCompleted =
+      g_sensorExternalEventRecognized + g_sensorExternalEventMissed;
+  const uint64_t sensorExternalEventCensored =
+      g_sensorExternalEventCount >= sensorExternalEventCompleted
+          ? g_sensorExternalEventCount - sensorExternalEventCompleted
+          : 0;
+  const double sensorExternalEventRecognitionRate =
+      sensorExternalEventCompleted > 0
+          ? 100.0 * static_cast<double> (g_sensorExternalEventRecognized) /
+                static_cast<double> (sensorExternalEventCompleted)
+          : -1.0;
+  const double sensorExternalEventDelayMeanMs =
+      g_sensorExternalEventDelaysMs.empty ()
+          ? -1.0
+          : std::accumulate (g_sensorExternalEventDelaysMs.begin (),
+                             g_sensorExternalEventDelaysMs.end (),
+                             0.0) /
+                static_cast<double> (g_sensorExternalEventDelaysMs.size ());
+  const double sensorExternalEventDelayP50Ms =
+      g_sensorExternalEventDelaysMs.empty ()
+          ? -1.0
+          : Percentile (g_sensorExternalEventDelaysMs, 50.0);
   const auto cpmType = MetricSupervisor::messageType_cpm;
   const double nrLatencyP50 = nrMetrics->getLatencyPercentile_messagetype (cpmType, 50.0);
   const double nrLatencyP90 = nrMetrics->getLatencyPercentile_messagetype (cpmType, 90.0);
@@ -4924,6 +5540,15 @@ main (int argc, char* argv[])
             << g_mecForwardNoReceiver << std::endl;
   std::cout << "NR background TX/drops/bytes: " << g_interferenceTx << "/"
             << g_interferenceDrops << "/" << g_interferenceBytes << std::endl;
+  std::cout << "Sensor-external candidate/selected/events/recognized/missed/censored: "
+            << g_sensorExternalEventCandidateVehicles << "/"
+            << g_sensorExternalEventSelectedVehicles << "/" << g_sensorExternalEventCount << "/"
+            << g_sensorExternalEventRecognized << "/" << g_sensorExternalEventMissed << "/"
+            << sensorExternalEventCensored << std::endl;
+  std::cout << "Sensor-external recognition (%), delay mean/p50 (ms): "
+            << FormatThesisMetric (sensorExternalEventRecognitionRate) << ","
+            << FormatThesisMetric (sensorExternalEventDelayMeanMs) << "/"
+            << FormatThesisMetric (sensorExternalEventDelayP50Ms) << std::endl;
 
   if (!summaryCsvPath.empty ())
     {
@@ -4946,7 +5571,13 @@ main (int argc, char* argv[])
           << "mec_latency_p95_ms,mec_latency_p99_ms,interference_tx,interference_drops,"
           << "interference_bytes,ttl_violation_rate,never_received_rate,"
           << "high_ttl_violation_rate,high_never_received_rate,"
-          << "low_ttl_violation_rate,low_never_received_rate" << std::endl;
+          << "low_ttl_violation_rate,low_never_received_rate,"
+          << "sensor_external_event_candidate_vehicles,sensor_external_event_selected_vehicles,"
+          << "sensor_external_event_count,sensor_external_event_recognized,"
+          << "sensor_external_event_missed,sensor_external_event_censored,"
+          << "sensor_external_event_recognition_rate,"
+          << "sensor_external_event_delay_mean_ms,sensor_external_event_delay_p50_ms"
+          << std::endl;
       summaryCsv << method << "," << FormatThesisMetric (recognitionRate) << ","
                  << FormatThesisMetric (highPriorityObjectRecognitionRate) << ","
                  << FormatThesisMetric (lowPriorityObjectRecognitionRate) << ","
@@ -4982,7 +5613,16 @@ main (int argc, char* argv[])
                  << FormatThesisMetric (highTtlViolationRate) << ","
                  << FormatThesisMetric (highNeverReceivedRate) << ","
                  << FormatThesisMetric (lowTtlViolationRate) << ","
-                 << FormatThesisMetric (lowNeverReceivedRate) << std::endl;
+                 << FormatThesisMetric (lowNeverReceivedRate) << ","
+                 << g_sensorExternalEventCandidateVehicles << ","
+                 << g_sensorExternalEventSelectedVehicles << ","
+                 << g_sensorExternalEventCount << ","
+                 << g_sensorExternalEventRecognized << ","
+                 << g_sensorExternalEventMissed << ","
+                 << sensorExternalEventCensored << ","
+                 << FormatThesisMetric (sensorExternalEventRecognitionRate) << ","
+                 << FormatThesisMetric (sensorExternalEventDelayMeanMs) << ","
+                 << FormatThesisMetric (sensorExternalEventDelayP50Ms) << std::endl;
     }
 
   if (g_routeLog.is_open ())
@@ -4992,6 +5632,10 @@ main (int argc, char* argv[])
   if (g_observationLog.is_open ())
     {
       g_observationLog.close ();
+    }
+  if (g_rsuPredictionLog.is_open ())
+    {
+      g_rsuPredictionLog.close ();
     }
 
   Simulator::Destroy ();
