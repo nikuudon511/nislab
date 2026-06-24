@@ -248,12 +248,14 @@ struct MovingBackgroundConfig
   Time packetInterval = Seconds (0.0);
   Time stopTime = Seconds (0.0);
   bool enabled = false;
+  bool fixedZones = false;
   double periodSeconds = 20.0;
   double amplitude = 0.8;
   double speedMps = 25.0;
   double minFactor = 0.2;
   double widthMeters = 500.0;
   double roadLengthMeters = 3000.0;
+  uint64_t generation = 0;
 };
 
 struct PriorityMotionState
@@ -294,6 +296,7 @@ struct HybridRouteConfig
 };
 
 static std::unordered_map<std::string, VehicleRuntime> g_vehicleRuntime;
+static std::unordered_map<std::string, uint64_t> g_backgroundGenerationByVehicle;
 static std::unordered_map<std::string, Ptr<Node>> g_allVehicleNodes;
 static std::unordered_map<uint64_t, std::string> g_vehicleIdByStationId;
 static std::unordered_map<std::string, PredictiveCbrState> g_predictiveCbrState;
@@ -301,6 +304,8 @@ static TrafficFlowPredictionState g_trafficFlowPrediction;
 static PredictiveRmrConfig g_predictiveRmrConfig;
 static HybridRouteConfig g_hybridRouteConfig;
 static std::vector<TrafficFlowRsuInfo> g_trafficFlowRsus;
+static std::string g_fixedRsuCbrMode = "disabled";
+static const std::array<double, 6> g_fixedRsuCbrValues = {{0.4, 0.8, 0.4, 0.9, 0.6, 0.4}};
 static std::unordered_map<std::string, TrafficFlowRsuPrediction>
     g_trafficFlowRsuPredictions;
 static std::unordered_map<std::string, uint32_t> g_trafficFlowRsuI2vCounts;
@@ -3017,23 +3022,43 @@ GetVehicleRsuPrediction (const std::string& vehicleId,
       const int direction =
           roadId.rfind ("highway_wb", 0) == 0 || roadId.rfind ("loop_r", 0) == 0 ? -1 : 1;
       const TrafficFlowRsuInfo* selected = nullptr;
+      std::size_t selectedIndex = 0;
       double selectedDistance = std::numeric_limits<double>::infinity ();
-      for (const auto& rsu : g_trafficFlowRsus)
+      for (std::size_t index = 0; index < g_trafficFlowRsus.size (); ++index)
         {
+          const auto& rsu = g_trafficFlowRsus[index];
           const double signedDistance = (rsu.x - position.x) * direction;
           const double distance = std::abs (rsu.x - position.x);
-          if (signedDistance < 0.0 ||
-              distance > g_predictiveRmrConfig.rsuI2vRangeMeters ||
+          const bool eligible =
+              g_fixedRsuCbrMode == "current"
+                  ? distance <= selectedDistance
+                  : signedDistance >= 0.0 &&
+                        distance <= g_predictiveRmrConfig.rsuI2vRangeMeters &&
+                        distance < selectedDistance;
+          if (!eligible ||
               distance >= selectedDistance)
             {
               continue;
             }
           selected = &rsu;
+          selectedIndex = index;
           selectedDistance = distance;
         }
       if (selected == nullptr)
         {
           return false;
+        }
+      if (g_fixedRsuCbrMode != "disabled")
+        {
+          *predictedCbr =
+              g_fixedRsuCbrValues[std::min (selectedIndex, g_fixedRsuCbrValues.size () - 1)];
+          *peakTimeSeconds =
+              g_fixedRsuCbrMode == "next"
+                  ? selectedDistance /
+                        std::max (g_sumoClient->TraCIAPI::vehicle.getSpeed (vehicleId), 1.0)
+                  : 0.0;
+          ++g_trafficFlowRsuI2vCounts[selected->id];
+          return true;
         }
       const auto predictionIt = g_trafficFlowRsuPredictions.find (selected->id);
       if (predictionIt == g_trafficFlowRsuPredictions.end ())
@@ -3177,9 +3202,12 @@ GenerateDsrcInterference (Ptr<Socket> socket,
                           std::string sourceVehicleId,
                           MovingBackgroundConfig config)
 {
-  if (Simulator::Now () >= config.stopTime)
+  const auto generationIt = g_backgroundGenerationByVehicle.find (sourceVehicleId);
+  if (Simulator::Now () >= config.stopTime ||
+      g_vehicleRuntime.find (sourceVehicleId) == g_vehicleRuntime.end () ||
+      generationIt == g_backgroundGenerationByVehicle.end () ||
+      generationIt->second != config.generation)
     {
-      socket->Close ();
       return;
     }
 
@@ -3188,16 +3216,42 @@ GenerateDsrcInterference (Ptr<Socket> socket,
     {
       try
         {
-          const double x = g_sumoClient->TraCIAPI::vehicle.getPosition (sourceVehicleId).x;
           const double roadLength = std::max (config.roadLengthMeters, 1.0);
+          const double rawX =
+              g_sumoClient->TraCIAPI::vehicle.getPosition (sourceVehicleId).x;
+          const double x = std::fmod (std::fmod (rawX, roadLength) + roadLength, roadLength);
           const double center =
               std::fmod (config.speedMps * Simulator::Now ().GetSeconds (), roadLength);
           const double directDistance = std::abs (x - center);
-          const double wrappedDistance = roadLength - directDistance;
+          const double wrappedDistance = std::max (0.0, roadLength - directDistance);
           const double distance = std::min (directDistance, wrappedDistance);
           factor = distance <= config.widthMeters / 2.0
                        ? 1.0 + config.amplitude
                        : config.minFactor;
+        }
+      catch (...)
+        {
+        }
+    }
+  else if (config.fixedZones && g_sumoClient != nullptr && !g_trafficFlowRsus.empty ())
+    {
+      try
+        {
+          const double x = g_sumoClient->TraCIAPI::vehicle.getPosition (sourceVehicleId).x;
+          std::size_t nearestIndex = 0;
+          double nearestDistance = std::numeric_limits<double>::infinity ();
+          for (std::size_t index = 0; index < g_trafficFlowRsus.size (); ++index)
+            {
+              const double distance = std::abs (g_trafficFlowRsus[index].x - x);
+              if (distance < nearestDistance)
+                {
+                  nearestDistance = distance;
+                  nearestIndex = index;
+                }
+            }
+          factor =
+              g_fixedRsuCbrValues[std::min (nearestIndex, g_fixedRsuCbrValues.size () - 1)] /
+              0.6;
         }
       catch (...)
         {
@@ -3678,6 +3732,7 @@ main (int argc, char* argv[])
   bool enablePcap = false;
   bool enableDsrcInterference = false;
   bool nrBgMovingWave = false;
+  bool nrBgFixedZones = false;
   bool enableNrSensing = false;
   bool enableChannelRandomness = false;
   bool enableReactiveRmr = false;
@@ -3700,6 +3755,8 @@ main (int argc, char* argv[])
   double sumoWaitForSocket = 5.0;
   double sumoSyncInterval = 0.01;
   uint32_t sumoPort = 3400;
+  int32_t sumoSeed = 10;
+  uint64_t rngRun = 1;
   double observationLogInterval = 1.0;
   double thesisEvalInterval = 1.0;
   uint32_t thesisEvalStartMinVehicles = 0;
@@ -3741,6 +3798,7 @@ main (int argc, char* argv[])
   double rsuPassivePdrMidCbr = 0.90;
   double rsuPassiveSaturationCbr = 0.90;
   double rsuI2vRangeMeters = 300.0;
+  std::string fixedRsuCbrMode = "disabled";
   double predictorCpmSizeWeight = 0.0;
   double predictorCpmTxRateWeight = 0.0;
   double predictorActiveVehicleWeight = 0.0;
@@ -3848,6 +3906,9 @@ main (int argc, char* argv[])
   cmd.AddValue ("nr-bg-moving-wave",
                 "Modulate NR background packet size as a spatially moving sine wave",
                 nrBgMovingWave);
+  cmd.AddValue ("nr-bg-fixed-zones",
+                "Scale NR background by fixed RSU zone CBR profile",
+                nrBgFixedZones);
   cmd.AddValue ("nr-bg-wave-period", "Moving background wave period [s]", nrBgWavePeriodSeconds);
   cmd.AddValue ("nr-bg-wave-amplitude",
                 "Moving background fractional amplitude [0,1]",
@@ -3903,6 +3964,9 @@ main (int argc, char* argv[])
   cmd.AddValue ("rsu-i2v-range",
                 "Maximum distance [m] for using the next RSU prediction",
                 rsuI2vRangeMeters);
+  cmd.AddValue ("fixed-rsu-cbr-mode",
+                "Fixed RSU CBR input: disabled, current, or next",
+                fixedRsuCbrMode);
   cmd.AddValue ("predictor-cpm-size-norm",
                 "Normalization value for the CPM size predictor feature [bytes]",
                 predictorCpmSizeNormBytes);
@@ -4064,11 +4128,14 @@ main (int argc, char* argv[])
   cmd.AddValue ("sumo-wait-socket", "Seconds to wait for SUMO/TraCI socket startup", sumoWaitForSocket);
   cmd.AddValue ("sumo-sync-interval", "SUMO/ns-3 synchronization interval [s]", sumoSyncInterval);
   cmd.AddValue ("sumo-port", "TCP port used by SUMO/TraCI", sumoPort);
+  cmd.AddValue ("sumo-seed", "SUMO random seed", sumoSeed);
+  cmd.AddValue ("rng-run", "ns-3 RNG run number", rngRun);
   cmd.AddValue ("sumo-extra-options", "Additional command line options passed to SUMO", sumoAdditionalOptions);
   cmd.AddValue ("nr-sensing", "Enable NR-V2X sidelink sensing", enableNrSensing);
   cmd.AddValue ("nr-channel-randomness", "Enable NR channel randomness/shadowing", enableChannelRandomness);
   cmd.AddValue ("nr-mcs", "Fixed NR sidelink MCS", mcs);
   cmd.Parse (argc, argv);
+  RngSeedManager::SetRun (rngRun);
 
   if (method == "no-control")
     {
@@ -4222,6 +4289,11 @@ main (int argc, char* argv[])
     {
       NS_FATAL_ERROR ("rsu-i2v-range must be greater than 0");
     }
+  if (fixedRsuCbrMode != "disabled" && fixedRsuCbrMode != "current" &&
+      fixedRsuCbrMode != "next")
+    {
+      NS_FATAL_ERROR ("fixed-rsu-cbr-mode must be disabled, current, or next");
+    }
   if (trafficFlowTopology != "loop" && trafficFlowTopology != "straight")
     {
       NS_FATAL_ERROR ("traffic-flow-topology must be loop or straight");
@@ -4315,6 +4387,7 @@ main (int argc, char* argv[])
   g_predictiveRmrConfig.rsuPassivePdrMidCbr = Clamp01 (rsuPassivePdrMidCbr);
   g_predictiveRmrConfig.rsuPassiveSaturationCbr = Clamp01 (rsuPassiveSaturationCbr);
   g_predictiveRmrConfig.rsuI2vRangeMeters = rsuI2vRangeMeters;
+  g_fixedRsuCbrMode = fixedRsuCbrMode;
   g_predictiveRmrConfig.cpmSizeWeight = predictorCpmSizeWeight;
   g_predictiveRmrConfig.cpmTxRateWeight = predictorCpmTxRateWeight;
   g_predictiveRmrConfig.activeVehicleWeight = predictorActiveVehicleWeight;
@@ -4925,7 +4998,7 @@ main (int argc, char* argv[])
   sumoClient->SetAttribute ("PenetrationRate", DoubleValue (1.0));
   sumoClient->SetAttribute ("SumoLogFile", BooleanValue (false));
   sumoClient->SetAttribute ("SumoStepLog", BooleanValue (false));
-  sumoClient->SetAttribute ("SumoSeed", IntegerValue (10));
+  sumoClient->SetAttribute ("SumoSeed", IntegerValue (sumoSeed));
   sumoClient->SetAttribute ("SumoWaitForSocket", TimeValue (Seconds (sumoWaitForSocket)));
 
   if (enableMecV2n2v && !g_useIdealMecLink)
@@ -5196,6 +5269,8 @@ main (int argc, char* argv[])
     if (enableDsrcInterference &&
         (dsrcInterferencePerVehicle || stationId <= dsrcInterferenceNodeCount))
       {
+        const uint64_t backgroundGeneration =
+            ++g_backgroundGenerationByVehicle[vehicleId];
         const uint32_t sourceIndex = static_cast<uint32_t> (stationId - 1);
         const Time stopTime =
             Seconds (dsrcInterferenceStop > 0.0 ? dsrcInterferenceStop : simTime);
@@ -5204,12 +5279,14 @@ main (int argc, char* argv[])
             MilliSeconds (dsrcInterferenceIntervalMs),
             stopTime,
             nrBgMovingWave,
+            nrBgFixedZones,
             nrBgWavePeriodSeconds,
             nrBgWaveAmplitude,
             nrBgWaveSpeedMps,
             nrBgWaveMinFactor,
             nrBgWaveWidthMeters,
-            trafficFlowRoadLengthMeters};
+            trafficFlowRoadLengthMeters,
+            backgroundGeneration};
         const double phaseStepMs =
             dsrcInterferenceIntervalMs /
             static_cast<double> (dsrcInterferencePerVehicle ? numberOfNodes
@@ -5231,6 +5308,7 @@ main (int argc, char* argv[])
     mob->SetPosition (Vector (-1000.0 + (rand () % 25), 320.0 + (rand () % 25), 250.0));
 
     const uint64_t stationId = VehicleIdToStationId (vehicleId);
+    ++g_backgroundGenerationByVehicle[vehicleId];
     g_allVehicleNodes.erase (vehicleId);
     g_vehicleIdByStationId.erase (stationId);
     g_nonCavStationIds.erase (stationId);
