@@ -20,32 +20,45 @@ plt.rcParams["font.sans-serif"] = [
 ]
 plt.rcParams["axes.unicode_minus"] = False
 
-methods = ["無制御", "予測\nRMR", "高重要度\nV2N2V", "適応型\nV2N2V"]
-orr_all = [52.76, 52.76, 74.97, 91.67]
-orr_high = [83.76, 83.76, 99.35, 99.54]
-orr_low = [38.85, 38.85, 64.41, 87.53]
-cbr = [71.9, 53.1, 53.1, 53.1]
+methods = ["無制御", "反応型\nRMR", "予測\nRMR", "高重要度\nV2N2V", "適応型\nV2N2V"]
+orr_all = [52.55, 53.18, 53.18, 75.63, 91.59]
+orr_high = [83.51, 83.51, 83.51, 99.61, 99.68]
+orr_low = [38.74, 39.57, 39.57, 65.32, 87.47]
+cbr = [82.3, 52.3, 52.3, 52.3, 52.3]
 
 x = np.arange(len(methods))
 width = 0.23
 
-fig, ax = plt.subplots(figsize=(5.2, 5.0))
+fig, ax = plt.subplots(figsize=(6.0, 5.0))
 
-ax.bar(x - width, orr_all, width, label="全体ORR", color="#1f77b4")
-ax.bar(
+bars_all = ax.bar(x - width, orr_all, width, label="全体ORR", color="#1f77b4")
+bars_high = ax.bar(
     x,
     orr_high,
     width,
     label="高重要度ORR",
     color="#aec7e8",
 )
-ax.bar(
+bars_low = ax.bar(
     x + width,
     orr_low,
     width,
     label="低重要度ORR",
     color="#ffbb78",
 )
+
+for bars in (bars_all, bars_high, bars_low):
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            height + 1.0,
+            f"{height:.2f}",
+            ha="center",
+            va="bottom",
+            rotation=0,
+            fontsize=7,
+        )
 ax.plot(
     x,
     cbr,

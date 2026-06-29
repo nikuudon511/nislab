@@ -1,0 +1,28 @@
+undefined
+\RequirePackage{times}
+\RequirePackage[T1]{fontenc}
+\RequirePackage{mathptmx}
+\RequirePackage{enumitem}
+
+\setlength{\columnsep}{7mm}
+\setlength{\parindent}{1zw}
+\setlength{\parskip}{0pt}
+\pagestyle{empty}
+\renewcommand{\baselinestretch}{0.96}
+\setlist{nosep,leftmargin=2zw}
+
+\makeatletter
+\newcommand{\fitmaketitle}[6]{%
+  \twocolumn[
+    \vspace*{-4mm}
+    \begin{center}
+      \rule{\textwidth}{0.4pt}\par
+      \vspace{2mm}
+      {\LARGE\bfseries #1\par}
+      \vspace{1.5mm}
+      {\Large #2\par}
+      \vspace{3mm}
+      {\large #3\par}
+      \vspace{0.5mm}
+
+undefined

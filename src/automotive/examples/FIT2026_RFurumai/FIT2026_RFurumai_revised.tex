@@ -1,0 +1,179 @@
+\documentclass{fitj}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{amsmath}
+\usepackage{txfonts}
+\usepackage{pifont}
+\usepackage{url}
+\usepackage{multirow}
+\usepackage{hhline}
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+% \def\labelenumi{(\theenumi)}
+
+\bibliographystyle{junsrt}
+
+% 和文タイトル-----------------------------------------------------------------
+\jtitle{協調認識のための交通流予測に基づく\\帯域適応型V2Xハイブリッド経路制御方式の検討}
+%---------------------------------------------------------------------------
+
+% 英文タイトル-----------------------------------------------------------------
+\etitle{Bandwidth-Adaptive V2X Hybrid Routing Control\\Based on Traffic Flow Prediction for Cooperative Perception}
+%---------------------------------------------------------------------------
+
+% 著者数：著者の数だけ c を書く---------------------------------------------------
+\authors{cccc}
+%---------------------------------------------------------------------------
+
+% 和文著者名：著者名間に & を書く------------------------------------------------
+\jauthors{古米 遼成\dag & 末澤 智崇\ddag & Onur Alparslan\S & 佐藤 健哉\ddag\S}
+%---------------------------------------------------------------------------
+
+% 欧文著者名：著者名間に & を書く------------------------------------------------
+\eauthors{Ryosei Furumai & Satoshi Suezawa &  & Kenya Sato}
+
+%\pagestyle{plain}
+%\setcounter{page}{7}
+
+\begin{document}
+
+\maketitle
+
+% 所属
+\footnotetext{{\dag} 同志社大学 理工学部 情報システムデザイン学科　Faculty of Science and Engineering, Doshisha University}
+\footnotetext{{\ddag} 同志社大学大学院 理工学研究科 情報工学専攻　Information and Computer Science, Graduate School of Science and Engineering, Doshisha University}
+\footnotetext{{\S} 同志社大学モビリティ研究センター　Mobility Research Center, Doshisha University}
+
+%---------------------------------------------------------------------
+
+%---------------------------------------------------------------------
+
+\section{はじめに}
+自動運転車両の安全性向上において，車載センサで得た周辺物標情報をCollective Perception Message（CPM）として共有する協調認識サービスが注目されている．また，路側機（Road Side Unit: RSU）が下流の交通状況や危険情報を上流車両へ事前に通知する安全走行支援システムの検討が進められており\cite{soumu2025}，車車間通信（Vehicle-to-Vehicle: V2V）およびセルラ網を用いた通信技術の確立が求められている． 
+
+しかし，車両密集環境においては，膨大なCPMの送信により無線チャネルが逼迫し，パケット衝突や遅延に伴う協調認識性能の低下を招く．従来の反応型混雑制御では，現在観測されたチャネル混雑度（Channel Busy Ratio: CBR）に基づいて送信制御を行うため\cite{etsidcc}，車両群の流入に伴って高負荷となる区間が時間的に変化する環境では対応が遅れ，突発的な通信品質の劣化を招く恐れがある．
+
+そこで本稿では，車両密集環境における突発的な通信品質劣化を抑制し，協調認識率を維持・向上することを目的とし，上流交通流情報に基づくCBR予測方式，および物標重要度に基づく帯域適応型ハイブリッド経路制御方式を提案する．
+
+\section{関連研究}
+山崎らは，歩行者情報が冗長性緩和ルール（Redundancy Mitigation Rules: RMR）により削除されると歩行者認識率が低下する点に着目し，歩行者情報を優先的にCPMへ含めるRMRを提案した\cite{yamasaki2023}．この方式は歩行者認識率を維持しつつV2Vの送信負荷を低減できる一方，下流混雑の先読みや別経路による物標情報の補完は対象としていないため，突発的な通信品質劣化が発生する可能性がある．
+
+\section{提案方式}
+
+\subsection{概要}
+本方式では，物標重要度を距離，接近速度および衝突余裕時間（Time To Collision: TTC）に基づいて定義する．図\ref{fig:proposal_overview}に示すように，RSU間で共有した上流交通流情報から予測CBRを算出し，車両は予測CBRと物標重要度に基づいてV2V経路と，MEC（Multi-access Edge Computing）を介したV2N2V経路を選択する．
+
+  \begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{概要図.png}
+    \caption{$\hat{C}_{n}$ が制御閾値以下の場合の提案方式}
+    \label{fig:proposal_overview}
+  \end{figure}
+
+\subsection{RSU間連携による下流混雑の先読み方式}
+本方式では，上流RSUで観測された車両群の位置，速度，CPM送信量をRSU間で共有し，車両群が下流区間へ流入した際のCBRを予測する．
+
+RSUは周辺車両の位置，速度，CPM送信量および実測CBRを観測する．上流RSUから共有された交通流情報を用い，予測時間内に自区間へ流入する車両数を算出する．区間$n$における予測CBR $\hat{C}_{n}$ を次式で定義する．
+\begin{equation}
+{\small
+\hat{C}_{n} = \min \left( 1, \max(C^{m}_{n},C^{0}_{n}) + \max(0,C^{f}_{n}-C^{0}_{n}) \right)
+}
+\end{equation}
+\begin{equation}
+ C^{f}_{n} = \frac{N^{f}_{n}\lambda \bar{S}}{R}
+\end{equation}
+ここで，$C^{m}_{n}$は実測CBR，$C^{0}_{n}$は現在の車両数から算出したCBR，$C^{f}_{n}$は予測流入車両数$N^{f}_{n}$が発生させるCBRであり，$\lambda$はCPM送信頻度，$\bar{S}$は平均CPMサイズ，$R$はチャネル伝送速度である．式(1)において実測値と現在算出値の $\max$ をとることで，突発的なトラフィックに対してもマージンを確保した予測を行う．本評価では，計算された予測CBR $\hat{C}_{n}$ を路車間通知（Infrastructure-to-Vehicle: I2V）により下流から接近する車両群へ通知することを想定する．
+
+\subsection{物標重要度に基づく帯域適応型経路制御方式}
+車両は通知された予測CBRと，自車センサが捉えた各物標の重要度に基づいて通信経路を動的に決定する．近距離，または短時間で接近する事故リスクの高い物標を「高重要度」と判定する．混雑環境下における高重要度情報の消失は事故に直結するため，V2VとV2N2Vの双方の通信経路を用いて二重送信を行い，到達信頼性を向上させる．
+
+一方，それ以外の低重要度情報は，予測CBR $\hat{C}_{n}$ に応じた確率でV2N2V経路にも転送し，V2V単独では認識困難な物標情報の到達性を補完する．低重要度情報をV2N2V経路にも転送する確率 $p_{\mathrm{L}}$ を次式で定義する．
+\begin{equation}
+p_{\mathrm{L}} =
+p_{\mathrm{L,max}}
+\cdot
+\frac{C_{\max}-\hat{C}_{n}}
+     {C_{\max}-C_{\mathrm{switch}}},
+\quad
+p_{\mathrm{L}} \in [0,p_{\mathrm{L,max}}].
+\end{equation}
+ここで，$p_{\mathrm{L,max}}$は低重要度情報のV2N2V転送確率の上限値である．予測CBRが高い場合には，高重要度情報の転送を優先するため，低重要度情報のV2N2V転送確率を低下させる．
+
+\section{評価}
+
+\subsection{評価環境}
+Van3Twinを用い，ns-3およびSUMOを統合した3\,kmの双方向6車線高速道路シナリオを構築した．予測時間は，RSU間隔約500\,mと平均速度約25\,m/sから20\,sとした．主な評価条件を表\ref{tab:condition}に示す．
+
+\begin{table}[t]
+\centering
+\caption{主な評価条件}
+\label{tab:condition}
+\small
+\begin{tabular}{cc}
+\hline
+項目 & 設定値 \\ \hline \hline
+シミュレーション時間 & 120\,s \\
+総車両数 / 通信車両数 & 250 / 100 \\
+RSU数 & 6 \\
+センサ範囲 / 評価範囲 & 100 / 200\,m \\
+交通流予測時間 & 20\,s \\
+I2V通知範囲 & 300\,m \\
+高 / 低重要度情報の有効時間 & 0.2 / 0.5\,s \\
+高重要度判定距離 / 速度 / TTC & 50\,m / 3\,m/s / 5\,s \\
+制御閾値 $C_{\mathrm{switch}}$ / $C_{\max}$ & 0.6 / 0.8 \\
+転送確率上限 $p_{\mathrm{L,max}}$ & 0.5 \\
+MEC遅延中央値 / p99 & 49 / 84\,ms \\
+MECダウンリンクPDR & 0.97 \\ \hline
+\end{tabular}
+\end{table}
+
+評価指標には，周辺物標認識率（ORR），重要度別ORR，平均CBR，および送信データ量を採用した．比較方式として無制御，現在CBRに基づく冗長情報削減（反応型RMR），予測CBRに基づく冗長情報削減（予測RMR），低重要度情報の二重送信を行わず高重要度情報のみを二重送信する方式，提案方式（適応型V2N2V）の5方式を評価した．
+
+\subsection{評価結果および考察}
+120秒間のシミュレーションにおける各方式の比較結果を図\ref{fig:result_graph}に示す．
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{result_graph.pdf}
+\caption{各方式における周辺物標認識率（ORR）と平均CBRの比較結果}
+\label{fig:result_graph}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{transmission_volume_graph.pdf}
+\caption{各方式におけるV2VおよびV2N2V送信量の比較結果}
+\label{fig:transmission_volume}
+\end{figure}
+
+反応型RMRおよび予測RMRは，無制御と同程度の全体ORRを維持したまま平均CBRを低減した．これは，認識率への寄与が小さい冗長な物標情報を削減し，CPMサイズおよびV2V送信量を抑制したためである．また，図\ref{fig:transmission_volume}は各方式の送信量を示しており，両RMRはORRの差が小さい一方でV2V送信量を削減する結果となった．したがって，RMRの主目的は認識率の直接的な向上ではなく，ORRを維持したV2V負荷の抑制にある．
+
+適応型V2N2Vは，高重要度ORRを99.68\%で維持しつつ，無制御では38.74\%であった低重要度ORRを87.47\%まで向上し，全体ORRを91.59\%へと引き上げた．これは，高重要度情報の二重送信による高い到達性と，予測CBRに応じて低重要度情報も確率的にV2N2V経路で共有することで，V2V未受信となる物標情報を補完できた結果である．V2N2V送信量はV2V送信量と比べて大きいが，高重要度V2N2Vと比較しても低重要度ORRを65.32\%から87.47\%へ改善しており，追加通信量に対する認識性能の改善効果を確認できる．
+
+一方，本評価環境では流入車両数の変化が比較的連続的であったため，予測CBR単体のORR改善効果は限定的であった．合流部や多車線流入，突発的な危険情報共有が発生する環境では，現在CBRに基づく制御との差がより顕著になると考えられる．
+
+\section{まとめ}
+本研究では，車両密集環境における突発的な通信品質劣化の課題に対し，予測CBRと物標重要度に基づいてV2V/V2N2V経路を動的に選択する方式を提案した．評価の結果，V2Vのチャネル負荷を抑制しつつ，V2N2V経路により全体ORRを向上できることを示した．
+
+%---------------------------------------------------------------------
+
+%---------------------------------------------------------------------
+
+\section*{謝辞}
+本研究の一部はJSPS科研費JP24H00698の助成を受けたものである．
+
+%----------------------------------------------------------------------
+
+%----------------------------------------------------------------------
+{\footnotesize 
+\begin{thebibliography}{99}
+  \bibitem{soumu2025} 
+  総務省, “自動運転に係る情報通信インフラの取組について”, 第3回自動運転インフラ検討会資料 (2025).
+
+  \bibitem{etsidcc} 
+  ETSI, “Intelligent Transport Systems (ITS); Decentralized Congestion Control Mechanisms”, ETSI TS 102 687, Vol.1, No.2 (2011).
+
+  \bibitem{yamasaki2023} 
+  山崎 慎也, “車両の走行環境を考慮した協調認識メッセージにおける冗長性緩和手法”, 同志社大学修士論文 (2023).
+\end{thebibliography}
+}
+\end{document}
+%---------------------------------------------------------------------

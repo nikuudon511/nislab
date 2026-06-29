@@ -1,0 +1,234 @@
+\documentclass[a4paper,10pt,twocolumn,uplatex]{jsarticle}
+\usepackage{style/nislab,style/resume}
+
+% 疑似コード設定
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+
+% RequireとEnsureをInputとOutputにする
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+\makeatletter
+\renewcommand{\ALG@name}{アルゴリズム}
+\makeatother
+%---------------------------------------------------------------------
+% レジュメ種別・日付設定（要変更）
+% \type{} 1:修士論文諮問会 2:卒業論文発表会 3:月例発表会 4:研究室合同発表会
+%---------------------------------------------------------------------
+\type{1}
+\year{2026}
+\month{1}
+\date{28}
+
+%---------------------------------------------------------------------
+% ページ番号設定（要変更）
+%---------------------------------------------------------------------
+\setcounter{page}{1}
+
+%---------------------------------------------------------------------
+% 変更不要
+%---------------------------------------------------------------------
+\begin{document}
+
+%---------------------------------------------------------------------
+% タイトル作成部分（要変更）
+% \maketitle{タイトル}{title}{名前}{name}
+%---------------------------------------------------------------------
+\maketitle{Multi-BYTE：BYTEに基づく多段階分類による物体追跡手法}
+{Multi-BYTE: A Multi-Stage Classification Method \\ for Multi-Object Tracking Based on BYTE}
+{岩井 駿人}
+{Hayato Iwai}
+
+%---------------------------------------------------------------------
+\section{はじめに}
+近年，深層学習を中心とした画像認識技術の発展により，動画中の人物や車両など複数対象を同時に追跡するMOT (Multi-Object Tracking：物体追跡)が，監視システム，自動運転など多様な分野で重要になっている．
+MOTでは，各フレームで検出される対象に一貫したIDを付与し続けることで，対象の移動軌跡を推定でき，動線把握や行動分析，危険予測といった上位タスクへ活用できる．
+一方，実環境では混雑や遮蔽，反射などの影響により，検出結果の信頼度が大きく変動しやすい．
+その結果，低信頼の検出の増加や，高信頼の検出の欠落により，対象の対応付けが不安定になる．
+さらに，実環境での導入に際しては，追跡性能だけでなく処理速度も同時に満たす必要がある．
+そこで本研究では，検出されたバウンディングボックスの信頼度に応じた，多段階分類による関連付けにより，安定したMOT手法の実現を目指す．
+%---------------------------------------------------------------------
+\section{関連研究}
+高性能かつ処理速度の速いMOTアルゴリズムとして，BYTE\cite{ByteTrack}が存在する．
+BYTEでは，閾値に基づいてバウンディングボックスを上下2つのグループに分け，上位グループから関連付けを行うことで高性能な追跡を実現している．
+そして，強力な検出器であるYOLOXをBYTEに組み込んだ，ByteTrackと呼ばれるトラッカーを作成し，2022年時点でMOT17において世界1を達成した．
+しかし，課題点として，固定の閾値に依存するため環境ごとに変化させる柔軟な対応が出来ない点や，混雑時などにバウンディングボックスの信頼度が上下に偏った際に閾値がうまく機能しない点が挙げられる．
+%---------------------------------------------------------------------
+\section{提案手法}
+本研究では，BYTEのアルゴリズムに基づいた新しいMOTアルゴリズムである，「Multi-BYTE」を提案する．
+具体的には，BYTEでは上下2段階のグループに分類していたバウンディングボックスを，アルゴリズム\ref{alg:code}に示すように，3つ以上の段階以上に分類する．
+段階数を増やし，それぞれの段階で適切な関連付けを行うことで，前節で説明した課題の解決を目指す．
+\par
+また，2段階分類を$n$段階分類に拡張する際に，上位のグループを細分化するのか，下位のグループを細分化するかで実装上の違いが生じる．
+本研究では，上位のグループを細分化する手法を実装A，下位のグループを細分化する手法を実装Bとする．
+
+\begin{algorithm}[htb]
+  \caption{提案手法Multi-BYTEの疑似コード}
+  \label{alg:code}
+  \begin{algorithmic}[1]
+    \setstretch{0.8}
+    \small
+    
+    % 入力・出力
+    \Require 映像 $V$, 検出器 $\text{Det}$, 閾値 $\tau_n$, 関連付け手法 Similarity$\#n$
+    \Ensure 追跡結果 $T$
+    
+    % 初期化
+    \State $T \gets \emptyset$
+    
+    % メインの繰り返し
+    \For{$frame_t$ in $V$}
+      \State /* バウンディングボックスと信頼度の予測 */
+      \State $D_t \gets \text{Det}(frame_t)$  
+      \State
+      \State /* バウンディングボックスを$n$個の閾値で分割 */
+      \For{$i$ = 1 to $n$}
+        \State $D_n \gets \emptyset$
+      \EndFor
+      \For{d in $D_t$}
+        \For{$i$ = 1 to $n$}
+          \If{$d.score > \tau_n$}
+              \State $D_n \gets D_n \cup \{d\}$
+              \State \textbf{break}
+          \EndIf
+        \EndFor
+      \EndFor
+      \State
+      \State /*  トラックレットの位置予測 */
+      \For{t in $T$}
+          \State $t \gets \text{KalmanFilter}(t)$
+      \EndFor
+      \State
+      \State /* 信頼度の高いグループから関連付け */
+      \State $T_\text{remain} \gets T$
+      \For{$i$ = $n$ to 1}
+        \State /* グループ$i$の関連付け */
+        \State Similarity\#$i$ を用いて $T_\text{remain}$ と $D_i$ を関連付け
+        \State $D_\text{remain} \gets D_\text{remain} \cup D_i$ の残り
+        \State $T_\text{remain} \gets T_\text{remain}$ に残り
+      \EndFor
+      \State
+      \State /* 検出できなくなったトラックレットの削除 */
+      \State $T \gets T \setminus T_\text{remain}$
+      \State
+      \State /* 新しく検出されたバウンディングボックスの登録 */
+      \For{$d$ in $D_\text{remain}$}
+        \If{$d.score > \tau_\text{remain}$}
+          \State $T \gets T \cup \{d\}$
+        \EndIf
+      \EndFor
+    \EndFor
+    
+    % 終了リターン
+    \State \textbf{Return} $T$
+  \end{algorithmic}
+\end{algorithm}
+
+%---------------------------------------------------------------------
+\section{評価}
+\subsection{概要}
+本研究では，MOT17，MOT20\cite{MOT}をベンチマークとして使用し，BYTEとの性能比較のための実験を行った．
+評価には，MOTAをはじめとするMOTアルゴリズムにおける指標を用いた．
+また，ByteTrackと同様に検出器にはYOLOXを使用し，関連付けの際にはIoU及びハンガリアンアルゴリズムを使用した．
+\subsection{実験}
+提案手法の有効性を総合的に評価するために，実験1，実験2，実験3の3つの実験を行った．
+実験1では，分類数$n$が性能に与える影響を評価するため，分類数$n$を2から5に変化させ，MOT17のHalf Valにおいて，前述の評価指標を計測した．
+実験2では，閾値に対する堅牢性を評価するため，$n=2$から$n=4$に関して，0.1から0.9までの0.1刻みで設定可能な閾値の組み合わせに対して，MOT17のHalf ValにおいてのMOTAを計測した．
+実験3では，総合的な性能の評価のために，実験1，実験2における最善の閾値の組み合わせを採用し，MOT17及びMOT20においての評価指標を計測した．
+\subsection{結果と考察}
+実験1の結果を\tabref{tab:実験結果1}に，実験2の結果を\figref{fig:実験結果2-3}，\figref{fig:実験結果2-4}に，実験3の結果を\tabref{tab:実験結果3}に示す．
+\par
+実験1の結果から，BYTEと比較し提案手法は，追跡性能や処理速度が同等もしくは下回る結果となった．
+特に，FPやFNの結果から，曖昧なケースを排除し，確実な検出結果のみに依存すると考えられる．
+\par
+実験1及び実験2の結果から，追跡性能や閾値に対する堅牢性は，実装Aのほうが優れていることが確認された．
+また，実装Aでは堅牢性が向上し，実装BではBYTEと同様の堅牢性であることから，BYTEが有する閾値に対する堅牢性を継承できているといえる．
+\par
+提案手法は，間違った追跡を防ぐ一方で検出漏れを増加させる結果となったが，MOT17-11においては，分類数を増加させることで性能が向上した．
+この映像は，混雑したショッピングモール内の映像であり，反射やオクルージョンにより，中間の信頼度帯が少なく上下に偏る状況である．
+このような場合は，段階数を増やすことで，各信頼度帯が適切に別れ，安定した追跡が可能になり，性能が改善された．
+信頼度に応じて段階構成を選択できる点が提案手法の有用性であり，BYTEより柔軟なトラッカーであるといえる．
+
+\begin{table}[htb]
+    \centering
+    \scriptsize
+    \caption{MOT17 Half Valにおける手法別評価結果}
+    \label{tab:実験結果1}
+    \begin{tabular}{lc|cccccc}
+        \specialrule{1.6pt}{0pt}{0pt}
+        関連付け手法 & 分類数 & MOTA↑ & IDs↓ & FP↓ & FN↓ & FPS↑ \\
+        \hline
+        BYTE & $n=2$ & \textbf{76.4} & 189 & 3700 & \textbf{8824} & 10.36 \\
+        \specialrule{1.6pt}{0pt}{0pt}
+        Multi-BYTE &  $n=3$ & 76.2 & 170 & 3398 & 9240 & 10.66 \\
+        実装A &  $n=4$ & 75.9 & 215 & 3312 & 9451 & 10.58 \\
+        &  $n=5$ & 75.6 & 255 & 3279 & 9632 & 10.56 \\
+        \hline
+        Multi-BYTE &  $n=3$ & 73.5 & 188 & 3449 & 10645 & 10.02 \\
+        実装B &  $n=4$ & 73.0 & 175 & 2308 & 12079 & 10.45 \\
+        &  $n=5$ & 71.4 & \textbf{146} & \textbf{1392} & 13863 & \textbf{10.68} \\
+        \specialrule{1.6pt}{0pt}{0pt}
+    \end{tabular}
+\end{table}
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.48\linewidth]{img/1-3.png}
+  \hfill
+  \includegraphics[width=0.48\linewidth]{img/2-3.png}
+  \caption{$n=3$における閾値別MOTA（左から実装A・実装B）}
+  \label{fig:実験結果2-3}
+\end{figure}
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.48\linewidth]{img/1-4.png}
+  \hfill
+  \includegraphics[width=0.48\linewidth]{img/2-4.png}
+  \caption{$n=4$における閾値別MOTA（左から実装A・実装B）}
+  \label{fig:実験結果2-4}
+\end{figure}
+
+\begin{table}[htb]
+    \centering
+    \scriptsize
+    \caption{手法別評価結果（上からMOT17・MOT20）}
+    \label{tab:実験結果3}
+    \begin{tabular}{l|ccccccc}
+        \specialrule{1.6pt}{0pt}{0pt}
+        関連付け手法 & MOTA↑ & HOTA↑ & IDs↓ & FP↓ & FN↓ \\
+        \hline
+        BYTE & \textbf{80.3} & \textbf{63.1} & \textbf{2196} & \textbf{25491} & \textbf{83721} \\
+        Multi-BYTE & 79.5 & \textbf{63.1} & 2479 & 28722 & 84383 \\
+        \specialrule{1.6pt}{0pt}{0pt}
+    \end{tabular}
+    \\[6pt]
+    \begin{tabular}{l|ccccccc}
+        \specialrule{1.6pt}{0pt}{0pt}
+        関連付け手法 & MOTA↑ & HOTA↑ & IDs↓ & FP↓ & FN↓ \\
+        \hline
+        BYTE & \textbf{77.8} &  \textbf{61.3} & \textbf{1223} & 26249 & \textbf{87594} \\
+        Multi-BYTE & 75.3 & 59.6 & 1436 & \textbf{23444} & 102682 \\
+        \specialrule{1.6pt}{0pt}{0pt}
+    \end{tabular}
+\end{table}
+
+%---------------------------------------------------------------------
+\section{まとめ}
+近年，自動運転や監視システムなど多岐にわたる分野での応用が進んでおり，限られた資源の中での性能改善が求められている．
+その中で，BYTEに着目し，バウンディングボックスの2段階分類をより細分化し，3段階以上に分類する手法を検討する．
+この手法により，各段階で最適な関連付けを行い，追跡性能の改善を目指す．
+また，提案手法の効果を評価するために，MOT17とMOT20をベンチマークとして使用し，MOTAをはじめとする評価指標を用いて性能比較を行う．
+今後の課題として，分類数$n$の動的調整手法の検討や関連付け手法の最適化が挙げられる．
+
+%---------------------------------------------------------------------
+% Bibliography（参考文献）
+%---------------------------------------------------------------------
+% thebibliography を利用する場合は以下を使用
+\begin{thebibliography}{99}
+  \bibitem{ByteTrack} Yifu Zhang \textit{et al.}, ByteTrack: Multi-Object Tracking by Associating Every Detection Box, Computer Vision -- ECCV 2022, Springer, 2022, pp. 1-21.
+  \bibitem{MOT} Patrick Dendorfer \textit{et al.}, MOTChallenge: A Benchmark for Single-Camera Multiple Target Tracking, International Journal of Computer Vision, vol. 129, no. 4, pp. 845-881, 2020.
+\end{thebibliography}
+%---------------------------------------------------------------------
+\end{document}
+%---------------------------------------------------------------------

@@ -2991,6 +2991,8 @@ UpdateReactiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
     {
       const double cbr = channelMetrics->getCBRPerItem (entry.first);
       const double effectiveCbr = cbr >= 0.0 ? cbr : 0.0;
+      const double actionProbability = ComputePredictiveRmrActionProbability (effectiveCbr);
+      SetRmrActionProbability (entry.second, actionProbability);
       entry.second.dsrcContainer->getCPBasicService ()->setRmrCurrentCbr (effectiveCbr);
       if (entry.second.nrContainer != nullptr)
         {
