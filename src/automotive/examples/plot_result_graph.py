@@ -29,7 +29,7 @@ cbr = [82.3, 52.3, 52.3, 52.3, 52.3]
 x = np.arange(len(methods))
 width = 0.23
 
-fig, ax = plt.subplots(figsize=(6.0, 5.0))
+fig, ax = plt.subplots(figsize=(6.0, 4.6))
 
 bars_all = ax.bar(x - width, orr_all, width, label="全体ORR", color="#1f77b4")
 bars_high = ax.bar(
@@ -47,7 +47,7 @@ bars_low = ax.bar(
     color="#ffbb78",
 )
 
-for bars in (bars_all, bars_high, bars_low):
+for bars in (bars_all, bars_high):
     for bar in bars:
         height = bar.get_height()
         ax.text(
@@ -56,9 +56,19 @@ for bars in (bars_all, bars_high, bars_low):
             f"{height:.2f}",
             ha="center",
             va="bottom",
-            rotation=0,
-            fontsize=7,
+            fontsize=12,
         )
+
+for bar in bars_low:
+    height = bar.get_height()
+    ax.text(
+        bar.get_x() + bar.get_width() / 2,
+        height - 2.0,
+        f"{height:.2f}",
+        ha="center",
+        va="top",
+        fontsize=12,
+    )
 ax.plot(
     x,
     cbr,

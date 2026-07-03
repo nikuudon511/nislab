@@ -79,11 +79,22 @@ width = 0.62
 
 fig, ax = plt.subplots(figsize=(6.0, 2.4))
 
-ax.bar(x, v2v_mb, width, label="V2V", color="#4c78a8")
-ax.bar(x, v2n2v_mb, width, bottom=v2v_mb, label="V2N2V", color="#f58518")
+v2v_mb_arr = np.array(v2v_mb)
+v2n2v_mb_arr = np.array(v2n2v_mb)
+has_v2n2v = v2n2v_mb_arr > 0
+
+ax.bar(x, v2v_mb_arr, width, label="V2V", color="#4c78a8")
+ax.bar(
+    x[has_v2n2v],
+    v2n2v_mb_arr[has_v2n2v],
+    width,
+    bottom=v2v_mb_arr[has_v2n2v],
+    label="V2N2V",
+    color="#f58518",
+)
 
 for i, value in enumerate(v2v_mb):
-    ax.text(i, max(value, 2.0), f"{value:.1f}", ha="center", va="bottom", fontsize=9)
+    ax.text(i, max(value, 2.0), f"{value:.1f}", ha="center", va="bottom", fontsize=12)
 
 for i, value in enumerate(v2n2v_mb):
     if value <= 0:
@@ -94,7 +105,7 @@ for i, value in enumerate(v2n2v_mb):
         f"{value:.1f}",
         ha="center",
         va="center",
-        fontsize=9,
+        fontsize=12,
         color="white",
         fontweight="bold",
     )
@@ -102,7 +113,7 @@ for i, value in enumerate(v2n2v_mb):
 ax.set_ylabel("送信量（MB）")
 ax.set_xticks(x)
 ax.set_xticklabels(methods)
-ax.set_ylim(0, max(np.array(v2v_mb) + np.array(v2n2v_mb)) * 1.18)
+ax.set_ylim(0, max(v2v_mb_arr + v2n2v_mb_arr) * 1.18)
 ax.grid(axis="y", linestyle="--", alpha=0.7)
 ax.legend(
     loc="upper left",
