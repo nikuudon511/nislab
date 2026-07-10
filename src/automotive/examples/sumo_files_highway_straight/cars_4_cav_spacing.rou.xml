@@ -1,0 +1,9 @@
+<routes>
+  <vType id="cavDedicated80" accel="2.6" decel="4.5" sigma="0" length="5" minGap="2.5" maxSpeed="22.22" color="0,80,255"/>
+  <route id="eastbound" edges="highway_eb"/>
+  <route id="westbound" edges="highway_wb"/>
+  <vehicle id="veh1" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="500.0" departSpeed="0"/>
+  <vehicle id="veh2" type="cavDedicated80" route="eastbound" depart="0.0" departLane="1" departPos="540.0" departSpeed="0"/>
+  <vehicle id="veh3" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="500.0" departSpeed="0"/>
+  <vehicle id="veh4" type="cavDedicated80" route="westbound" depart="0.0" departLane="1" departPos="540.0" departSpeed="0"/>
+</routes>

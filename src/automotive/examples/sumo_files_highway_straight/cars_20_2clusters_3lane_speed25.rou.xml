@@ -1,0 +1,25 @@
+<routes>
+  <vType id="cavCluster" accel="2.6" decel="4.5" sigma="0.1" length="5" minGap="2.5" maxSpeed="25.00" color="0,120,255"/>
+  <route id="eastbound" edges="highway_eb"/>
+  <route id="westbound" edges="highway_wb"/>
+  <vehicle id="veh1" type="cavCluster" route="eastbound" depart="0.0" departLane="0" departPos="400.0" departSpeed="25.0"/>
+  <vehicle id="veh2" type="cavCluster" route="eastbound" depart="0.0" departLane="1" departPos="400.0" departSpeed="25.0"/>
+  <vehicle id="veh3" type="cavCluster" route="eastbound" depart="0.0" departLane="2" departPos="400.0" departSpeed="25.0"/>
+  <vehicle id="veh4" type="cavCluster" route="eastbound" depart="0.0" departLane="0" departPos="430.0" departSpeed="25.0"/>
+  <vehicle id="veh5" type="cavCluster" route="eastbound" depart="0.0" departLane="1" departPos="430.0" departSpeed="25.0"/>
+  <vehicle id="veh6" type="cavCluster" route="eastbound" depart="0.0" departLane="2" departPos="430.0" departSpeed="25.0"/>
+  <vehicle id="veh7" type="cavCluster" route="eastbound" depart="0.0" departLane="0" departPos="460.0" departSpeed="25.0"/>
+  <vehicle id="veh8" type="cavCluster" route="eastbound" depart="0.0" departLane="1" departPos="460.0" departSpeed="25.0"/>
+  <vehicle id="veh9" type="cavCluster" route="eastbound" depart="0.0" departLane="2" departPos="460.0" departSpeed="25.0"/>
+  <vehicle id="veh10" type="cavCluster" route="eastbound" depart="0.0" departLane="0" departPos="490.0" departSpeed="25.0"/>
+  <vehicle id="veh11" type="cavCluster" route="westbound" depart="0.0" departLane="0" departPos="400.0" departSpeed="25.0"/>
+  <vehicle id="veh12" type="cavCluster" route="westbound" depart="0.0" departLane="1" departPos="400.0" departSpeed="25.0"/>
+  <vehicle id="veh13" type="cavCluster" route="westbound" depart="0.0" departLane="2" departPos="400.0" departSpeed="25.0"/>
+  <vehicle id="veh14" type="cavCluster" route="westbound" depart="0.0" departLane="0" departPos="430.0" departSpeed="25.0"/>
+  <vehicle id="veh15" type="cavCluster" route="westbound" depart="0.0" departLane="1" departPos="430.0" departSpeed="25.0"/>
+  <vehicle id="veh16" type="cavCluster" route="westbound" depart="0.0" departLane="2" departPos="430.0" departSpeed="25.0"/>
+  <vehicle id="veh17" type="cavCluster" route="westbound" depart="0.0" departLane="0" departPos="460.0" departSpeed="25.0"/>
+  <vehicle id="veh18" type="cavCluster" route="westbound" depart="0.0" departLane="1" departPos="460.0" departSpeed="25.0"/>
+  <vehicle id="veh19" type="cavCluster" route="westbound" depart="0.0" departLane="2" departPos="460.0" departSpeed="25.0"/>
+  <vehicle id="veh20" type="cavCluster" route="westbound" depart="0.0" departLane="0" departPos="490.0" departSpeed="25.0"/>
+</routes>

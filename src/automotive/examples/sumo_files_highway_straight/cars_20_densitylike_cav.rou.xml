@@ -1,0 +1,26 @@
+<routes>
+  <vType id="cavDedicated80" accel="2.6" decel="4.5" sigma="0" length="5" minGap="2.5" maxSpeed="22.22" color="0,80,255"/>
+  <vType id="cavGeneral90" accel="2.6" decel="4.5" sigma="0.3" length="5" minGap="2.5" maxSpeed="25.00" color="0,140,255"/>
+  <route id="eastbound" edges="highway_eb"/>
+  <route id="westbound" edges="highway_wb"/>
+  <vehicle id="veh1" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="220.0" departSpeed="0"/>
+  <vehicle id="veh2" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="220.0" departSpeed="0"/>
+  <vehicle id="veh3" type="cavDedicated80" route="westbound" depart="0.0" departLane="2" departPos="236.0" departSpeed="0"/>
+  <vehicle id="veh4" type="cavGeneral90" route="westbound" depart="0.0" departLane="0" departPos="252.0" departSpeed="0"/>
+  <vehicle id="veh5" type="cavDedicated80" route="westbound" depart="0.0" departLane="1" departPos="268.0" departSpeed="0"/>
+  <vehicle id="veh6" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="193.0" departSpeed="0"/>
+  <vehicle id="veh7" type="cavGeneral90" route="eastbound" depart="0.0" departLane="1" departPos="193.0" departSpeed="0"/>
+  <vehicle id="veh8" type="cavDedicated80" route="eastbound" depart="0.0" departLane="2" departPos="205.0" departSpeed="0"/>
+  <vehicle id="veh9" type="cavGeneral90" route="eastbound" depart="0.0" departLane="0" departPos="217.0" departSpeed="0"/>
+  <vehicle id="veh10" type="cavDedicated80" route="eastbound" depart="0.0" departLane="1" departPos="229.0" departSpeed="0"/>
+  <vehicle id="veh11" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="307.0" departSpeed="0"/>
+  <vehicle id="veh12" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="307.0" departSpeed="0"/>
+  <vehicle id="veh13" type="cavDedicated80" route="westbound" depart="0.0" departLane="2" departPos="320.0" departSpeed="0"/>
+  <vehicle id="veh14" type="cavGeneral90" route="westbound" depart="0.0" departLane="0" departPos="333.0" departSpeed="0"/>
+  <vehicle id="veh15" type="cavDedicated80" route="westbound" depart="0.0" departLane="1" departPos="346.0" departSpeed="0"/>
+  <vehicle id="veh16" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="273.0" departSpeed="0"/>
+  <vehicle id="veh17" type="cavGeneral90" route="eastbound" depart="0.0" departLane="1" departPos="273.0" departSpeed="0"/>
+  <vehicle id="veh18" type="cavDedicated80" route="eastbound" depart="0.0" departLane="2" departPos="283.0" departSpeed="0"/>
+  <vehicle id="veh19" type="cavGeneral90" route="eastbound" depart="0.0" departLane="0" departPos="293.0" departSpeed="0"/>
+  <vehicle id="veh20" type="cavDedicated80" route="eastbound" depart="0.0" departLane="1" departPos="303.0" departSpeed="0"/>
+</routes>

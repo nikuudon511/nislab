@@ -1,0 +1,6 @@
+<nodes>
+  <node id="eb_start" x="139.0000000" y="34.9999281" type="dead_end"/>
+  <node id="eb_end" x="139.0329000" y="34.9999281" type="dead_end"/>
+  <node id="wb_start" x="139.0329000" y="35.0000719" type="dead_end"/>
+  <node id="wb_end" x="139.0000000" y="35.0000719" type="dead_end"/>
+</nodes>

@@ -90,6 +90,40 @@ Ask before doing any of the following:
 * using network access
 * changing git state
 
+## Research Implementation Exception
+
+When the user explicitly says "実装して", "修正して", "反映して",
+"進めて", "apply it", "edit the file", "modify the source", or
+"write the change", the assistant may, without asking again for the same task:
+
+* read directly relevant files
+* inspect up to 5 files
+* run up to 5 `grep`, `sed`, `find`, or equivalent short inspection commands
+* apply small patches
+* run `bash -n` for edited shell scripts
+* run `./ns3 build` after code changes
+
+The assistant must still ask before:
+
+* running simulations
+* using network access
+* editing unrelated files
+* changing git state
+* performing destructive operations
+* inspecting large logs
+
+Keep this exception scoped to the active task.  If the task scope changes,
+ask again.
+
+## Van3Twin Simulation Policy
+
+For simulation commands, default to providing copy-paste commands.
+Run simulations only when the user explicitly says "実行して".
+
+For short validation commands such as `bash -n`, `grep`, `sed`, and
+`./ns3 build`, the assistant may run them after explicit implementation
+approval.
+
 Use this fixed approval format:
 
 ```text

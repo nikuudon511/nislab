@@ -45,13 +45,25 @@ MEC_OBJECT_POLICY=${MEC_OBJECT_POLICY:-all-objects}
 MEC_ADAPTIVE_LOW_MAX_PROB=${MEC_ADAPTIVE_LOW_MAX_PROB:-0.5}
 MEC_MIN_HOLD_TIME=${MEC_MIN_HOLD_TIME:-5}
 MEC_IDEAL_LINK=${MEC_IDEAL_LINK:-true}
-MEC_IDEAL_LATENCY_MS=${MEC_IDEAL_LATENCY_MS:-50}
-MEC_IDEAL_LATENCY_STDDEV_MS=${MEC_IDEAL_LATENCY_STDDEV_MS:-15}
-MEC_IDEAL_LATENCY_MIN_MS=${MEC_IDEAL_LATENCY_MIN_MS:-20}
-MEC_IDEAL_LATENCY_MAX_MS=${MEC_IDEAL_LATENCY_MAX_MS:-100}
+MEC_IDEAL_DELAY_MODEL=${MEC_IDEAL_DELAY_MODEL:-empirical}
+MEC_IDEAL_LATENCY_MS=${MEC_IDEAL_LATENCY_MS:-39.4}
+MEC_IDEAL_LATENCY_STDDEV_MS=${MEC_IDEAL_LATENCY_STDDEV_MS:-20}
+MEC_IDEAL_LATENCY_MIN_MS=${MEC_IDEAL_LATENCY_MIN_MS:-6.1}
+MEC_IDEAL_LATENCY_P90_MS=${MEC_IDEAL_LATENCY_P90_MS:-59.86}
+MEC_IDEAL_LATENCY_P99_MS=${MEC_IDEAL_LATENCY_P99_MS:-120.33}
+MEC_IDEAL_LATENCY_MAX_MS=${MEC_IDEAL_LATENCY_MAX_MS:-201}
 MEC_IDEAL_CPM_INTERVAL_MS=${MEC_IDEAL_CPM_INTERVAL_MS:-100}
 MEC_IDEAL_PACKET_SIZE=${MEC_IDEAL_PACKET_SIZE:-500}
 MEC_IDEAL_DL_PDR=${MEC_IDEAL_DL_PDR:-1.0}
+MEC_IDEAL_CAPACITY_MODEL=${MEC_IDEAL_CAPACITY_MODEL:-true}
+MEC_IDEAL_BANDWIDTH_MHZ=${MEC_IDEAL_BANDWIDTH_MHZ:-20}
+MEC_IDEAL_SPECTRAL_EFFICIENCY_BPSHZ=${MEC_IDEAL_SPECTRAL_EFFICIENCY_BPSHZ:-4.5234}
+MEC_IDEAL_MAX_QUEUE_DELAY_MS=${MEC_IDEAL_MAX_QUEUE_DELAY_MS:-0}
+MEC_IDEAL_UL_FIRST_LOSS_RATE=${MEC_IDEAL_UL_FIRST_LOSS_RATE:-0.10}
+MEC_IDEAL_DL_FIRST_LOSS_RATE=${MEC_IDEAL_DL_FIRST_LOSS_RATE:-0.10}
+MEC_IDEAL_RETX_SUCCESS_PROB=${MEC_IDEAL_RETX_SUCCESS_PROB:-0.53}
+MEC_IDEAL_MAX_RETX=${MEC_IDEAL_MAX_RETX:-4}
+MEC_IDEAL_RETX_DELAY_MS=${MEC_IDEAL_RETX_DELAY_MS:-3}
 MAX_COMMUNICATION_VEHICLES=${MAX_COMMUNICATION_VEHICLES:-100}
 
 PRIORITY_DISTANCE=${PRIORITY_DISTANCE:-100}
@@ -75,7 +87,7 @@ NR_BG=${NR_BG:-true}
 NR_BG_NODES=${NR_BG_NODES:-6}
 NR_BG_PER_VEHICLE=${NR_BG_PER_VEHICLE:-false}
 NR_BG_SIZE=${NR_BG_SIZE:-1500}
-NR_BG_INTERVAL_MS=${NR_BG_INTERVAL_MS:-20}
+NR_BG_INTERVAL_MS=${NR_BG_INTERVAL_MS:-100}
 NR_BG_TARGET_CBR=${NR_BG_TARGET_CBR:-}
 NR_BG_TARGET_ACTIVE_VEHICLES=${NR_BG_TARGET_ACTIVE_VEHICLES:-60}
 NR_BG_CBR_BANDWIDTH_MBPS=${NR_BG_CBR_BANDWIDTH_MBPS:-6}
@@ -116,6 +128,10 @@ for method in $METHODS; do
       run_method="predictive-rmr-v2n2v"
       run_mec_object_policy="all-objects"
       ;;
+    v2n2v-only)
+      run_method="v2n2v-only"
+      run_mec_object_policy="all-objects"
+      ;;
     v2n2v-high-priority-only)
       run_method="predictive-rmr-v2n2v"
       run_mec_object_policy="high-priority-only"
@@ -131,13 +147,14 @@ for method in $METHODS; do
 
   /usr/bin/time -v -o "$RUN_DIR/resource_usage.txt" ./ns3 run "v2v-hybrid-nr-v2n2v \
     --method=$run_method \
-    --sumo-gui=false \
+    --sumo-gui=${SUMO_GUI:-false} \
     --sim-time=$SIM_TIME \
     --sumo-folder=$SUMO_FOLDER \
     --mob-trace=$MOB_TRACE \
     --sumo-config=$SUMO_CONFIG \
     --sumo-port=$run_port \
     --sumo-seed=$SUMO_SEED \
+    --sumo-sync-interval=${SUMO_SYNC_INTERVAL:-0.01} \
     --rng-run=$RNG_RUN \
     --switch-cbr=$SWITCH_CBR \
     --release-cbr=$RELEASE_CBR \
@@ -169,12 +186,24 @@ for method in $METHODS; do
     --mec-min-hold-time=$MEC_MIN_HOLD_TIME \
     --mec-ideal-link=$MEC_IDEAL_LINK \
     --mec-ideal-latency-ms=$MEC_IDEAL_LATENCY_MS \
+    --mec-ideal-delay-model=$MEC_IDEAL_DELAY_MODEL \
     --mec-ideal-latency-stddev-ms=$MEC_IDEAL_LATENCY_STDDEV_MS \
     --mec-ideal-latency-min-ms=$MEC_IDEAL_LATENCY_MIN_MS \
+    --mec-ideal-latency-p90-ms=$MEC_IDEAL_LATENCY_P90_MS \
+    --mec-ideal-latency-p99-ms=$MEC_IDEAL_LATENCY_P99_MS \
     --mec-ideal-latency-max-ms=$MEC_IDEAL_LATENCY_MAX_MS \
     --mec-ideal-cpm-interval-ms=$MEC_IDEAL_CPM_INTERVAL_MS \
     --mec-ideal-packet-size=$MEC_IDEAL_PACKET_SIZE \
     --mec-ideal-dl-pdr=$MEC_IDEAL_DL_PDR \
+    --mec-ideal-capacity-model=$MEC_IDEAL_CAPACITY_MODEL \
+    --mec-ideal-bandwidth-mhz=$MEC_IDEAL_BANDWIDTH_MHZ \
+    --mec-ideal-spectral-efficiency-bpshz=$MEC_IDEAL_SPECTRAL_EFFICIENCY_BPSHZ \
+    --mec-ideal-max-queue-delay-ms=$MEC_IDEAL_MAX_QUEUE_DELAY_MS \
+    --mec-ideal-ul-first-loss-rate=$MEC_IDEAL_UL_FIRST_LOSS_RATE \
+    --mec-ideal-dl-first-loss-rate=$MEC_IDEAL_DL_FIRST_LOSS_RATE \
+    --mec-ideal-retx-success-prob=$MEC_IDEAL_RETX_SUCCESS_PROB \
+    --mec-ideal-max-retx=$MEC_IDEAL_MAX_RETX \
+    --mec-ideal-retx-delay-ms=$MEC_IDEAL_RETX_DELAY_MS \
     --max-communication-vehicles=$MAX_COMMUNICATION_VEHICLES \
     --priority-distance=$PRIORITY_DISTANCE \
     --priority-closing-speed=$PRIORITY_CLOSING_SPEED \
@@ -212,6 +241,7 @@ for method in $METHODS; do
     --cbr-log=$RUN_DIR/channel.csv \
     --route-log=$RUN_DIR/route.csv \
     --observation-log=$RUN_DIR/observation.csv \
+    --cpm-input-diag-log=$RUN_DIR/cpm_input_diag.csv \
     --rsu-prediction-log=$RUN_DIR/rsu_prediction.csv \
     --summary-csv=$RUN_DIR/summary.csv" > "$RUN_DIR/stdout.txt" 2>&1
 

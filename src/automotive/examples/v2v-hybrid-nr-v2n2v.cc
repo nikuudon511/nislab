@@ -38,6 +38,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <numeric>
 #include <set>
 #include <sstream>
 #include <string>
@@ -130,6 +132,12 @@ struct ThesisEvaluationStats
   uint64_t nrUpdateSuccess = 0;
   uint64_t mecUpdateExpected = 0;
   uint64_t mecUpdateSuccess = 0;
+  uint64_t rmrDeletedEvalExpectedTotal = 0;
+  uint64_t rmrDeletedEvalExpectedHigh = 0;
+  uint64_t rmrDeletedEvalExpectedLow = 0;
+  uint64_t rmrDeletedEvalUnrecognizedTotal = 0;
+  uint64_t rmrDeletedEvalUnrecognizedHigh = 0;
+  uint64_t rmrDeletedEvalUnrecognizedLow = 0;
   uint64_t highIdealCpmRx = 0;
   uint64_t highTrueCpmRx = 0;
   uint64_t lowIdealCpmRx = 0;
@@ -312,6 +320,7 @@ static std::unordered_map<std::string, uint32_t> g_trafficFlowRsuI2vCounts;
 static std::ofstream g_routeLog;
 static std::ofstream g_observationLog;
 static std::ofstream g_rsuPredictionLog;
+static std::ofstream g_cpmInputDiagLog;
 static ThesisEvaluationStats g_thesisStats;
 static uint32_t g_thesisEvalStartMinVehicles = 0;
 static bool g_thesisEvalStartUseAllVehicles = true;
@@ -332,6 +341,10 @@ static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
 static uint64_t g_interferenceTx = 0;
 static uint64_t g_interferenceBytes = 0;
 static uint64_t g_interferenceDrops = 0;
+static bool g_nrBgMovingWaveForLog = false;
+static double g_nrBgWaveSpeedMpsForLog = 25.0;
+static double g_nrBgWaveWidthMetersForLog = 500.0;
+static double g_trafficFlowRoadLengthMetersForLog = 3000.0;
 static uint64_t g_mecUplinkPackets = 0;
 static uint64_t g_mecUplinkBytes = 0;
 static uint64_t g_mecForwardedPackets = 0;
@@ -345,18 +358,52 @@ static uint64_t g_idealMecHighSuccesses = 0;
 static uint64_t g_idealMecLowAttempts = 0;
 static uint64_t g_idealMecLowSuccesses = 0;
 static uint32_t g_idealMecPacketSizeBytes = 500;
-static Time g_idealMecLatency = MilliSeconds (50);
-static double g_idealMecLatencyMeanMs = 50.0;
+static Time g_idealMecLatency = MilliSeconds (39.4);
+static std::string g_idealMecDelayModel = "empirical";
+static double g_idealMecLatencyMeanMs = 39.4;
 static double g_idealMecLatencyStddevMs = 20.0;
-static double g_idealMecLatencyMinMs = 20.0;
-static double g_idealMecLatencyMaxMs = 150.0;
+static double g_idealMecLatencyMinMs = 6.1;
+static double g_idealMecLatencyP90Ms = 59.86;
+static double g_idealMecLatencyP99Ms = 120.33;
+static double g_idealMecLatencyMaxMs = 201.0;
 static Time g_idealMecInterval = MilliSeconds (100);
 static double g_mecForwardRangeMeters = 150.0;
 static bool g_useIdealMecLink = true;
+static bool g_idealMecCapacityModel = false;
+static double g_idealMecBandwidthMHz = 30.0;
+static double g_idealMecSpectralEfficiencyBpsHz = 4.5234;
+static double g_idealMecUplinkCapacityMbps = 135.702;
+static double g_idealMecDownlinkCapacityMbps = 135.702;
+static double g_idealMecMaxQueueDelayMs = 0.0;
+static Time g_idealMecUplinkAvailableAt = Seconds (0.0);
+static Time g_idealMecDownlinkAvailableAt = Seconds (0.0);
+static std::vector<double> g_idealMecCapacityDelaySamplesMs;
+static uint64_t g_idealMecCapacityQueueDrops = 0;
+static double g_idealMecUlFirstLossRate = 0.0;
+static double g_idealMecDlFirstLossRate = 0.0;
+static double g_idealMecRetxSuccessProbability = 1.0;
+static uint32_t g_idealMecMaxRetransmissions = 0;
+static double g_idealMecRetxDelayMs = 8.0;
+static uint64_t g_idealMecUlFirstLosses = 0;
+static uint64_t g_idealMecDlFirstLosses = 0;
+static uint64_t g_idealMecUlRetxRecovered = 0;
+static uint64_t g_idealMecDlRetxRecovered = 0;
+static uint64_t g_idealMecUlFinalLosses = 0;
+static uint64_t g_idealMecDlFinalLosses = 0;
+static std::vector<double> g_idealMecRetxDelaySamplesMs;
 static MecObjectPolicy g_mecObjectPolicy = MecObjectPolicy::AllObjects;
 static double g_mecAdaptiveLowMaxProbability = 0.5;
 static Ptr<NormalRandomVariable> g_idealMecLatencyRv;
+static Ptr<UniformRandomVariable> g_idealMecLatencyUniformRv;
 static std::vector<double> g_idealMecLatencySamplesMs;
+static std::vector<double> g_idealMecAoiSamplesMs;
+static uint64_t g_idealMecAoiSamples = 0;
+static uint64_t g_idealMecHighAoiSamples = 0;
+static uint64_t g_idealMecLowAoiSamples = 0;
+static std::array<uint64_t, 4> g_idealMecAoiWithinThreshold = {{0, 0, 0, 0}};
+static std::array<uint64_t, 4> g_idealMecHighAoiWithinThreshold = {{0, 0, 0, 0}};
+static std::array<uint64_t, 4> g_idealMecLowAoiWithinThreshold = {{0, 0, 0, 0}};
+static const std::array<double, 4> g_idealMecAoiThresholdsMs = {{50.0, 100.0, 200.0, 500.0}};
 static std::unordered_map<uint32_t, std::string> g_mecVehicleIdByIp;
 static std::unordered_map<std::string, Ipv4Address> g_mecIpByVehicleId;
 static Ptr<TraciClient> g_sumoClient;
@@ -376,8 +423,13 @@ static bool g_trafficFlowIsLoop = true;
 static Ptr<UniformRandomVariable> g_hybridRouteRandom;
 static uint32_t g_maxCommunicationVehicles = 0;
 static uint32_t g_communicationVehicleCount = 0;
+static double g_cpmStartDelaySeconds = 0.0;
+static uint64_t g_dsrcCpmStartCalls = 0;
+static uint64_t g_nrCpmStartCalls = 0;
+static uint64_t g_mecCpmStartCalls = 0;
 static double g_idealMecDownlinkPdr = 1.0;
 static Ptr<UniformRandomVariable> g_idealMecDownlinkRandom;
+static Ptr<UniformRandomVariable> g_idealMecRadioRandom;
 static bool g_sensorExternalEventsEnabled = false;
 static double g_sensorExternalEventProbability = 0.20;
 static double g_sensorExternalEventActivationRangeMeters = 400.0;
@@ -417,6 +469,8 @@ RouteName (ActiveRoute route)
     }
   return "MEC_V2N2V";
 }
+
+static double AverageLatestPrimaryCpmSizeBytes ();
 
 static std::string
 RouteStateName (bool dsrcActive, bool nrActive, bool mecActive)
@@ -985,12 +1039,49 @@ private:
 
 NS_OBJECT_ENSURE_REGISTERED (MecV2n2vForwarder);
 
+struct IdealMecRadioResult
+{
+  bool delivered = true;
+  bool firstLoss = false;
+  bool recovered = false;
+  Time delay = Seconds (0.0);
+};
+
+static IdealMecRadioResult
+ResolveIdealMecRadioLoss (double firstLossRate)
+{
+  IdealMecRadioResult result;
+  if (g_idealMecRadioRandom == nullptr ||
+      g_idealMecRadioRandom->GetValue (0.0, 1.0) >= firstLossRate)
+    {
+      return result;
+    }
+
+  result.firstLoss = true;
+  result.delivered = false;
+  for (uint32_t attempt = 0; attempt < g_idealMecMaxRetransmissions; ++attempt)
+    {
+      result.delay += MilliSeconds (g_idealMecRetxDelayMs);
+      if (g_idealMecRadioRandom->GetValue (0.0, 1.0) <=
+          g_idealMecRetxSuccessProbability)
+        {
+          result.delivered = true;
+          result.recovered = true;
+          break;
+        }
+    }
+  return result;
+}
+
 static void
 DeliverIdealMecCpmBatch (uint64_t senderStationId,
                          std::vector<std::pair<uint64_t, bool>> receivers,
+                         Time generatedAt,
                          double latencyMs)
 {
   const Time now = Simulator::Now ();
+  const double aoiMs =
+      std::max (0.0, static_cast<double> ((now - generatedAt).GetMilliSeconds ()));
   for (const auto& receiver : receivers)
     {
       const uint64_t receiverStationId = receiver.first;
@@ -1041,12 +1132,66 @@ DeliverIdealMecCpmBatch (uint64_t senderStationId,
           ++g_idealMecLowSuccesses;
         }
       g_idealMecLatencySamplesMs.push_back (latencyMs);
+      g_idealMecAoiSamplesMs.push_back (aoiMs);
+      ++g_idealMecAoiSamples;
+      if (receiver.second)
+        {
+          ++g_idealMecHighAoiSamples;
+        }
+      else
+        {
+          ++g_idealMecLowAoiSamples;
+        }
+      for (std::size_t i = 0; i < g_idealMecAoiThresholdsMs.size (); ++i)
+        {
+          if (aoiMs <= g_idealMecAoiThresholdsMs[i])
+            {
+              ++g_idealMecAoiWithinThreshold[i];
+              if (receiver.second)
+                {
+                  ++g_idealMecHighAoiWithinThreshold[i];
+                }
+              else
+                {
+                  ++g_idealMecLowAoiWithinThreshold[i];
+                }
+            }
+        }
     }
 }
 
 static Time
 SampleIdealMecLatency ()
 {
+  if (g_idealMecDelayModel == "empirical")
+    {
+      const double u =
+          g_idealMecLatencyUniformRv != nullptr
+              ? g_idealMecLatencyUniformRv->GetValue (0.0, 1.0)
+              : 0.5;
+      double latencyMs = g_idealMecLatencyMeanMs;
+      if (u < 0.90)
+        {
+          latencyMs = g_idealMecLatencyMinMs +
+                      (u / 0.90) * (g_idealMecLatencyP90Ms - g_idealMecLatencyMinMs);
+        }
+      else if (u < 0.99)
+        {
+          latencyMs = g_idealMecLatencyP90Ms +
+                      ((u - 0.90) / 0.09) *
+                          (g_idealMecLatencyP99Ms - g_idealMecLatencyP90Ms);
+        }
+      else
+        {
+          latencyMs = g_idealMecLatencyP99Ms +
+                      ((u - 0.99) / 0.01) *
+                          (g_idealMecLatencyMaxMs - g_idealMecLatencyP99Ms);
+        }
+      latencyMs = std::max (g_idealMecLatencyMinMs,
+                            std::min (g_idealMecLatencyMaxMs, latencyMs));
+      return MilliSeconds (latencyMs);
+    }
+
   double latencyMs = g_idealMecLatencyMeanMs;
   if (g_idealMecLatencyRv != nullptr && g_idealMecLatencyStddevMs > 0.0)
     {
@@ -1054,6 +1199,21 @@ SampleIdealMecLatency ()
     }
   latencyMs = std::max (g_idealMecLatencyMinMs, std::min (g_idealMecLatencyMaxMs, latencyMs));
   return MilliSeconds (latencyMs);
+}
+
+static Time
+ReserveIdealMecCapacity (Time arrivalTime, uint32_t bytes, double capacityMbps, Time& availableAt)
+{
+  if (!g_idealMecCapacityModel || capacityMbps <= 0.0 || bytes == 0)
+    {
+      return Seconds (0.0);
+    }
+  const Time start = availableAt > arrivalTime ? availableAt : arrivalTime;
+  const double transmissionSeconds =
+      (static_cast<double> (bytes) * 8.0) / (capacityMbps * 1.0e6);
+  const Time finish = start + Seconds (transmissionSeconds);
+  availableAt = finish;
+  return finish - arrivalTime;
 }
 
 static void
@@ -1113,9 +1273,19 @@ GenerateIdealMecCpm ()
   for (const std::size_t senderIndex : activeSenderIndexes)
     {
       const auto& senderEntry = vehiclePositions[senderIndex];
+      const uint32_t mecPacketSizeBytes =
+          std::max (1u,
+                    static_cast<uint32_t> (
+                        std::lround (AverageLatestPrimaryCpmSizeBytes ())));
       ++g_idealMecTx;
       ++g_mecUplinkPackets;
-      g_mecUplinkBytes += g_idealMecPacketSizeBytes;
+      g_mecUplinkBytes += mecPacketSizeBytes;
+      const Time generatedAt = Simulator::Now ();
+      const Time uplinkCapacityDelay =
+          ReserveIdealMecCapacity (generatedAt,
+                                   mecPacketSizeBytes,
+                                   g_idealMecUplinkCapacityMbps,
+                                   g_idealMecUplinkAvailableAt);
 
       uint32_t targets = 0;
       std::vector<std::pair<uint64_t, bool>> receivers;
@@ -1175,7 +1345,7 @@ GenerateIdealMecCpm ()
             }
           ++targets;
           ++g_mecForwardedPackets;
-          g_mecForwardedBytes += g_idealMecPacketSizeBytes;
+          g_mecForwardedBytes += mecPacketSizeBytes;
           receivers.emplace_back (VehicleIdToStationId (receiverEntry.vehicleId), highPriority);
         }
 
@@ -1185,13 +1355,116 @@ GenerateIdealMecCpm ()
         }
       else
         {
+          const IdealMecRadioResult ulRadio =
+              ResolveIdealMecRadioLoss (g_idealMecUlFirstLossRate);
+          if (ulRadio.firstLoss)
+            {
+              ++g_idealMecUlFirstLosses;
+            }
+          if (ulRadio.recovered)
+            {
+              ++g_idealMecUlRetxRecovered;
+            }
+          if (!ulRadio.delivered)
+            {
+              ++g_idealMecUlFinalLosses;
+              ++g_mecForwardDrops;
+              continue;
+            }
+          if (ulRadio.delay.GetMilliSeconds () > 0)
+            {
+              g_idealMecRetxDelaySamplesMs.push_back (ulRadio.delay.GetMilliSeconds ());
+            }
           const Time latency = SampleIdealMecLatency ();
-          const double latencyMs = latency.GetMilliSeconds ();
-          Simulator::Schedule (latency,
-                               &DeliverIdealMecCpmBatch,
-                               VehicleIdToStationId (senderEntry.vehicleId),
-                               std::move (receivers),
-                               latencyMs);
+          if (!g_idealMecCapacityModel)
+            {
+              for (const auto& receiver : receivers)
+                {
+                  const IdealMecRadioResult dlRadio =
+                      ResolveIdealMecRadioLoss (g_idealMecDlFirstLossRate);
+                  if (dlRadio.firstLoss)
+                    {
+                      ++g_idealMecDlFirstLosses;
+                    }
+                  if (dlRadio.recovered)
+                    {
+                      ++g_idealMecDlRetxRecovered;
+                    }
+                  if (!dlRadio.delivered)
+                    {
+                      ++g_idealMecDlFinalLosses;
+                      ++g_mecForwardDrops;
+                      continue;
+                    }
+                  if (dlRadio.delay.GetMilliSeconds () > 0)
+                    {
+                      g_idealMecRetxDelaySamplesMs.push_back (dlRadio.delay.GetMilliSeconds ());
+                    }
+                  const Time totalLatency = latency + ulRadio.delay + dlRadio.delay;
+                  std::vector<std::pair<uint64_t, bool>> oneReceiver;
+                  oneReceiver.push_back (receiver);
+                  Simulator::Schedule (totalLatency,
+                                       &DeliverIdealMecCpmBatch,
+                                       VehicleIdToStationId (senderEntry.vehicleId),
+                                       std::move (oneReceiver),
+                                       generatedAt,
+                                       totalLatency.GetMilliSeconds ());
+                }
+            }
+          else
+            {
+              for (const auto& receiver : receivers)
+                {
+                  const Time downlinkArrival =
+                      generatedAt + latency + uplinkCapacityDelay + ulRadio.delay;
+                  const Time downlinkCapacityDelay =
+                      ReserveIdealMecCapacity (downlinkArrival,
+                                               mecPacketSizeBytes,
+                                               g_idealMecDownlinkCapacityMbps,
+                                               g_idealMecDownlinkAvailableAt);
+                  const IdealMecRadioResult dlRadio =
+                      ResolveIdealMecRadioLoss (g_idealMecDlFirstLossRate);
+                  if (dlRadio.firstLoss)
+                    {
+                      ++g_idealMecDlFirstLosses;
+                    }
+                  if (dlRadio.recovered)
+                    {
+                      ++g_idealMecDlRetxRecovered;
+                    }
+                  if (!dlRadio.delivered)
+                    {
+                      ++g_idealMecDlFinalLosses;
+                      ++g_mecForwardDrops;
+                      continue;
+                    }
+                  if (dlRadio.delay.GetMilliSeconds () > 0)
+                    {
+                      g_idealMecRetxDelaySamplesMs.push_back (dlRadio.delay.GetMilliSeconds ());
+                    }
+                  const Time totalLatency =
+                      latency + uplinkCapacityDelay + downlinkCapacityDelay + ulRadio.delay +
+                      dlRadio.delay;
+                  const double capacityDelayMs =
+                      (uplinkCapacityDelay + downlinkCapacityDelay).GetMilliSeconds ();
+                  if (g_idealMecMaxQueueDelayMs > 0.0 &&
+                      capacityDelayMs > g_idealMecMaxQueueDelayMs)
+                    {
+                      ++g_mecForwardDrops;
+                      ++g_idealMecCapacityQueueDrops;
+                      continue;
+                    }
+                  g_idealMecCapacityDelaySamplesMs.push_back (capacityDelayMs);
+                  std::vector<std::pair<uint64_t, bool>> oneReceiver;
+                  oneReceiver.push_back (receiver);
+                  Simulator::Schedule (totalLatency,
+                                       &DeliverIdealMecCpmBatch,
+                                       VehicleIdToStationId (senderEntry.vehicleId),
+                                       std::move (oneReceiver),
+                                       generatedAt,
+                                       totalLatency.GetMilliSeconds ());
+                }
+            }
         }
     }
 
@@ -1216,6 +1489,25 @@ Percentile (std::vector<double> values, double percentile)
     }
   const double weight = rank - static_cast<double> (lower);
   return values[lower] + ((values[upper] - values[lower]) * weight);
+}
+
+static double
+Mean (const std::vector<double>& values)
+{
+  if (values.empty ())
+    {
+      return 0.0;
+    }
+  return std::accumulate (values.begin (), values.end (), 0.0) /
+         static_cast<double> (values.size ());
+}
+
+static double
+PercentRate (uint64_t numerator, uint64_t denominator)
+{
+  return denominator > 0 ? 100.0 * static_cast<double> (numerator) /
+                               static_cast<double> (denominator)
+                         : 0.0;
 }
 
 static Ptr<BSContainer>
@@ -1806,6 +2098,46 @@ AccumulateThesisRecognitionSample ()
           else if (expectedStationIds.count (stationId) > 0)
             {
               ++lowPriorityRecognizedObjects;
+            }
+        }
+
+      for (const auto& senderEntry : g_vehicleRuntime)
+        {
+          if (senderEntry.second.nrContainer == nullptr)
+            {
+              continue;
+            }
+          const auto& deletedIds =
+              senderEntry.second.nrContainer->getCPBasicService ()->getLastRmrDeletedIds ();
+          for (const uint64_t deletedId : deletedIds)
+            {
+              if (expectedStationIds.count (deletedId) == 0 ||
+                  sensorRecognizedStationIds.count (deletedId) > 0)
+                {
+                  continue;
+                }
+              const bool highPriority = highPriorityExpectedStationIds.count (deletedId) > 0;
+              ++g_thesisStats.rmrDeletedEvalExpectedTotal;
+              if (highPriority)
+                {
+                  ++g_thesisStats.rmrDeletedEvalExpectedHigh;
+                }
+              else
+                {
+                  ++g_thesisStats.rmrDeletedEvalExpectedLow;
+                }
+              if (recognizedStationIds.count (deletedId) == 0)
+                {
+                  ++g_thesisStats.rmrDeletedEvalUnrecognizedTotal;
+                  if (highPriority)
+                    {
+                      ++g_thesisStats.rmrDeletedEvalUnrecognizedHigh;
+                    }
+                  else
+                    {
+                      ++g_thesisStats.rmrDeletedEvalUnrecognizedLow;
+                    }
+                }
             }
         }
 
@@ -2698,6 +3030,9 @@ UpdateTrafficFlowCbrPrediction (Ptr<MetricSupervisor> channelMetrics, Time inter
   g_trafficFlowPrediction.meanSpeedMetersPerSecond = meanSpeed;
 }
 
+static bool
+IsInMovingBackgroundHighLoadZone (const std::string& vehicleId);
+
 static void
 OpenObservationLog (const std::string& path)
 {
@@ -2722,24 +3057,374 @@ OpenObservationLog (const std::string& path)
       << "nr_prr_avg,nr_packet_loss_avg,nr_latency_ms,nr_tx,nr_rx,"
       << "mec_prr_avg,mec_packet_loss_avg,mec_latency_ms,mec_tx,mec_rx,"
       << "legacy_cpm_objects,legacy_rmr_candidates,legacy_rmr_deleted_last,"
+      << "legacy_rmr_deleted_near_last,legacy_rmr_deleted_far_last,"
       << "legacy_cpm_objects_total,legacy_rmr_candidates_total,legacy_rmr_deleted_total,"
+      << "legacy_rmr_deleted_near_total,legacy_rmr_deleted_far_total,"
       << "legacy_cpm_size_bytes,legacy_cpm_size_bytes_total,nr_cpm_objects,nr_rmr_candidates,"
-      << "nr_rmr_deleted_last,nr_cpm_objects_total,nr_rmr_candidates_total,"
-      << "nr_rmr_deleted_total,nr_cpm_size_bytes,nr_cpm_size_bytes_total,"
+      << "nr_rmr_deleted_last,nr_rmr_deleted_near_last,nr_rmr_deleted_far_last,"
+      << "nr_cpm_objects_total,nr_rmr_candidates_total,nr_rmr_deleted_total,"
+      << "nr_rmr_deleted_near_total,nr_rmr_deleted_far_total,"
+      << "nr_cpm_size_bytes,nr_cpm_size_bytes_total,"
       << "mec_cpm_objects,mec_rmr_candidates,mec_rmr_deleted_last,"
+      << "mec_rmr_deleted_near_last,mec_rmr_deleted_far_last,"
       << "mec_cpm_objects_total,mec_rmr_candidates_total,mec_rmr_deleted_total,"
+      << "mec_rmr_deleted_near_total,mec_rmr_deleted_far_total,"
       << "mec_cpm_size_bytes,mec_cpm_size_bytes_total,"
+      << "legacy_cpm_wannabe_sent,legacy_cpm_sent,"
+      << "nr_cpm_wannabe_sent,nr_cpm_sent,"
+      << "mec_cpm_wannabe_sent,mec_cpm_sent,"
+      << "legacy_cpm_start_calls,nr_cpm_start_calls,mec_cpm_start_calls,"
       << "cam_rx,cpm_rx,interference_tx,interference_bytes,interference_drops,"
+      << "bg_high_load_active_vehicles,bg_high_load_all_vehicles,"
       << "interference_offered_cbr,"
       << "mec_uplink_packets,mec_uplink_bytes,mec_forwarded_packets,"
       << "mec_forwarded_bytes,mec_forward_drops,mec_forward_no_receiver,"
+      << "mec_aoi_mean_ms,mec_aoi_p50_ms,mec_aoi_p90_ms,mec_aoi_p99_ms,"
+      << "mec_aoi_le_50_ms_rate,mec_aoi_le_100_ms_rate,"
+      << "mec_aoi_le_200_ms_rate,mec_aoi_le_500_ms_rate,"
+      << "mec_high_aoi_le_50_ms_rate,mec_high_aoi_le_100_ms_rate,"
+      << "mec_high_aoi_le_200_ms_rate,mec_high_aoi_le_500_ms_rate,"
+      << "mec_low_aoi_le_50_ms_rate,mec_low_aoi_le_100_ms_rate,"
+      << "mec_low_aoi_le_200_ms_rate,mec_low_aoi_le_500_ms_rate,"
+      << "mec_capacity_delay_mean_ms,mec_capacity_delay_p90_ms,"
+      << "mec_capacity_delay_p99_ms,mec_capacity_queue_drops,"
+      << "mec_ul_first_losses,mec_dl_first_losses,"
+      << "mec_ul_retx_recovered,mec_dl_retx_recovered,"
+      << "mec_ul_final_losses,mec_dl_final_losses,"
+      << "mec_retx_delay_mean_ms,mec_retx_delay_p90_ms,"
       << "orr,high_pdr,low_pdr,high_packet_loss,low_packet_loss,"
       << "high_ideal_rx,high_true_rx,low_ideal_rx,low_true_rx,"
       << "ttl_violation_rate,never_received_rate,"
       << "high_ttl_violation_rate,high_never_received_rate,"
       << "low_ttl_violation_rate,low_never_received_rate,"
+      << "rmr_deleted_eval_expected_total,rmr_deleted_eval_expected_high,"
+      << "rmr_deleted_eval_expected_low,rmr_deleted_eval_unrecognized_total,"
+      << "rmr_deleted_eval_unrecognized_high,rmr_deleted_eval_unrecognized_low,"
       << "active_all_vehicles,rsu_i2v_vehicle_count,rsu_i2v_predicted_cbr_avg,"
       << "rsu_i2v_prediction_lead_time_avg" << std::endl;
+}
+
+static void
+OpenCpmInputDiagLog (const std::string& path)
+{
+  if (path.empty ())
+    {
+      return;
+    }
+
+  g_cpmInputDiagLog.open (path, std::ios::out);
+  if (!g_cpmInputDiagLog.is_open ())
+    {
+      NS_FATAL_ERROR ("Unable to open CPM input diagnostic log file: " << path);
+    }
+
+  g_cpmInputDiagLog
+      << "time_s,active_vehicles,position_samples,speed_min_mps,speed_avg_mps,"
+      << "speed_max_mps,heading_min_deg,heading_max_deg,nearest_distance_min_m,"
+      << "neighbors_within_sensor_avg,neighbors_within_orr_avg,"
+      << "nr_ldm_pos,nr_ldm_perceived_by_self,"
+      << "nr_ldm_x_abs_min_cm,nr_ldm_x_abs_max_cm,"
+      << "nr_ldm_y_abs_min_cm,nr_ldm_y_abs_max_cm,"
+      << "nr_ldm_speed_abs_min_cms,nr_ldm_speed_abs_max_cms,"
+      << "nr_ldm_acc_abs_min_cms2,nr_ldm_acc_abs_max_cms2,"
+      << "nr_ldm_acc_unavailable,"
+      << "nr_ldm_heading_min_deg,nr_ldm_heading_max_deg,"
+      << "nr_ldm_length_min_dm,nr_ldm_length_max_dm,"
+      << "nr_ldm_width_min_dm,nr_ldm_width_max_dm,"
+      << "nr_ldm_measurement_delta_min_ms,nr_ldm_measurement_delta_max_ms,"
+      << "nr_ldm_measurement_delta_negative,nr_ldm_measurement_delta_gt1500,"
+      << "nr_ldm_distance_abs_gt131071,"
+      << "nr_vdp_lat_min,nr_vdp_lat_max,nr_vdp_lon_min,nr_vdp_lon_max,"
+      << "nr_vdp_heading_min,nr_vdp_heading_max,nr_vdp_speed_min,nr_vdp_speed_max,"
+      << "legacy_cpm_objects,nr_cpm_objects,mec_cpm_objects,"
+      << "legacy_cpm_wannabe_sent,legacy_cpm_sent,"
+      << "nr_cpm_wannabe_sent,nr_cpm_sent,"
+      << "mec_cpm_wannabe_sent,mec_cpm_sent,"
+      << "legacy_cpm_start_calls,nr_cpm_start_calls,mec_cpm_start_calls"
+      << std::endl;
+}
+
+static void
+WriteCpmInputDiagLog (uint32_t activeVehicles,
+                      uint32_t dsrcCpmObjects,
+                      uint32_t nrCpmObjects,
+                      uint32_t mecCpmObjects,
+                      uint64_t dsrcCpmWannabeSent,
+                      uint64_t dsrcCpmSent,
+                      uint64_t nrCpmWannabeSent,
+                      uint64_t nrCpmSent,
+                      uint64_t mecCpmWannabeSent,
+                      uint64_t mecCpmSent)
+{
+  if (!g_cpmInputDiagLog.is_open () || g_sumoClient == nullptr)
+    {
+      return;
+    }
+
+  struct Snapshot
+  {
+    double x;
+    double y;
+    double speed;
+    double angle;
+  };
+
+  std::vector<Snapshot> snapshots;
+  snapshots.reserve (g_vehicleRuntime.size ());
+  double speedMin = std::numeric_limits<double>::max ();
+  double speedMax = 0.0;
+  double speedSum = 0.0;
+  double angleMin = std::numeric_limits<double>::max ();
+  double angleMax = -std::numeric_limits<double>::max ();
+
+  for (const auto& entry : g_vehicleRuntime)
+    {
+      try
+        {
+          const auto pos = g_sumoClient->TraCIAPI::vehicle.getPosition (entry.first);
+          const double speed = g_sumoClient->TraCIAPI::vehicle.getSpeed (entry.first);
+          const double angle = g_sumoClient->TraCIAPI::vehicle.getAngle (entry.first);
+          snapshots.push_back ({pos.x, pos.y, speed, angle});
+          speedMin = std::min (speedMin, speed);
+          speedMax = std::max (speedMax, speed);
+          speedSum += speed;
+          angleMin = std::min (angleMin, angle);
+          angleMax = std::max (angleMax, angle);
+        }
+      catch (...)
+        {
+        }
+    }
+
+  double nearestMin = -1.0;
+  uint64_t sensorNeighbors = 0;
+  uint64_t orrNeighbors = 0;
+  for (uint32_t i = 0; i < snapshots.size (); ++i)
+    {
+      double localNearest = std::numeric_limits<double>::max ();
+      for (uint32_t j = 0; j < snapshots.size (); ++j)
+        {
+          if (i == j)
+            {
+              continue;
+            }
+          const double dx = snapshots[i].x - snapshots[j].x;
+          const double dy = snapshots[i].y - snapshots[j].y;
+          const double distance = std::sqrt (dx * dx + dy * dy);
+          localNearest = std::min (localNearest, distance);
+          if (distance <= g_sensorRangeMeters)
+            {
+              ++sensorNeighbors;
+            }
+          if (distance <= g_orrRangeMeters)
+            {
+              ++orrNeighbors;
+            }
+        }
+      if (localNearest < std::numeric_limits<double>::max ())
+        {
+          nearestMin = nearestMin < 0.0 ? localNearest : std::min (nearestMin, localNearest);
+        }
+    }
+
+  const double sampleCount = static_cast<double> (snapshots.size ());
+
+  uint64_t nrLdmPos = 0;
+  uint64_t nrLdmPerceivedBySelf = 0;
+  uint64_t nrLdmMeasurementDeltaNegative = 0;
+  uint64_t nrLdmMeasurementDeltaGt1500 = 0;
+  uint64_t nrLdmDistanceAbsGt131071 = 0;
+  uint64_t nrVdpSamples = 0;
+  long nrXMin = std::numeric_limits<long>::max ();
+  long nrXMax = std::numeric_limits<long>::min ();
+  long nrYMin = std::numeric_limits<long>::max ();
+  long nrYMax = std::numeric_limits<long>::min ();
+  long nrSpeedMin = std::numeric_limits<long>::max ();
+  long nrSpeedMax = std::numeric_limits<long>::min ();
+  long nrAccMin = std::numeric_limits<long>::max ();
+  long nrAccMax = std::numeric_limits<long>::min ();
+  uint64_t nrAccUnavailable = 0;
+  double nrHeadingMin = std::numeric_limits<double>::max ();
+  double nrHeadingMax = -std::numeric_limits<double>::max ();
+  long nrLengthMin = std::numeric_limits<long>::max ();
+  long nrLengthMax = std::numeric_limits<long>::min ();
+  long nrWidthMin = std::numeric_limits<long>::max ();
+  long nrWidthMax = std::numeric_limits<long>::min ();
+  int64_t nrDeltaMinMs = std::numeric_limits<int64_t>::max ();
+  int64_t nrDeltaMaxMs = std::numeric_limits<int64_t>::min ();
+  long nrLatMin = std::numeric_limits<long>::max ();
+  long nrLatMax = std::numeric_limits<long>::min ();
+  long nrLonMin = std::numeric_limits<long>::max ();
+  long nrLonMax = std::numeric_limits<long>::min ();
+  long nrHeadingValueMin = std::numeric_limits<long>::max ();
+  long nrHeadingValueMax = std::numeric_limits<long>::min ();
+  long nrSpeedValueMin = std::numeric_limits<long>::max ();
+  long nrSpeedValueMax = std::numeric_limits<long>::min ();
+  const int64_t nowUs = Simulator::Now ().GetMicroSeconds ();
+
+  auto updateLongRange = [] (long value, long& minValue, long& maxValue) {
+    minValue = std::min (minValue, value);
+    maxValue = std::max (maxValue, value);
+  };
+  auto longOrMinusOne = [] (uint64_t count, long value) {
+    return count == 0 ? -1 : value;
+  };
+  auto int64OrMinusOne = [] (uint64_t count, int64_t value) {
+    return count == 0 ? static_cast<int64_t> (-1) : value;
+  };
+  auto doubleOrMinusOne = [] (uint64_t count, double value) {
+    return count == 0 ? -1.0 : value;
+  };
+
+  for (auto& entry : g_vehicleRuntime)
+    {
+      if (entry.second.nrContainer == nullptr || entry.second.nrContainer->getLDM () == nullptr)
+        {
+          continue;
+        }
+
+      if (entry.second.nrContainer->getVDP () != nullptr)
+        {
+          auto cpmData = entry.second.nrContainer->getVDP ()->getCPMMandatoryData ();
+          ++nrVdpSamples;
+          updateLongRange (cpmData.latitude, nrLatMin, nrLatMax);
+          updateLongRange (cpmData.longitude, nrLonMin, nrLonMax);
+          updateLongRange (cpmData.heading.getValue (), nrHeadingValueMin, nrHeadingValueMax);
+          updateLongRange (cpmData.speed.getValue (), nrSpeedValueMin, nrSpeedValueMax);
+        }
+
+      std::vector<LDM::returnedVehicleData_t> ldmPos;
+      if (!entry.second.nrContainer->getLDM ()->getAllPOs (ldmPos))
+        {
+          continue;
+        }
+
+      const uint64_t selfStationId = VehicleIdToStationId (entry.first);
+      nrLdmPos += ldmPos.size ();
+      for (auto& po : ldmPos)
+        {
+          auto& data = po.vehData;
+          if (!data.perceivedBy.isAvailable () ||
+              static_cast<uint64_t> (data.perceivedBy.getData ()) != selfStationId)
+            {
+              continue;
+            }
+          ++nrLdmPerceivedBySelf;
+
+          if (data.xDistAbs.isAvailable ())
+            {
+              const long value = data.xDistAbs.getData ();
+              updateLongRange (value, nrXMin, nrXMax);
+              if (std::labs (value) > 131071)
+                {
+                  ++nrLdmDistanceAbsGt131071;
+                }
+            }
+          if (data.yDistAbs.isAvailable ())
+            {
+              const long value = data.yDistAbs.getData ();
+              updateLongRange (value, nrYMin, nrYMax);
+              if (std::labs (value) > 131071)
+                {
+                  ++nrLdmDistanceAbsGt131071;
+                }
+            }
+          if (data.xSpeedAbs.isAvailable ())
+            {
+              updateLongRange (data.xSpeedAbs.getData (), nrSpeedMin, nrSpeedMax);
+            }
+          if (data.ySpeedAbs.isAvailable ())
+            {
+              updateLongRange (data.ySpeedAbs.getData (), nrSpeedMin, nrSpeedMax);
+            }
+          if (data.xAccAbs.isAvailable ())
+            {
+              updateLongRange (data.xAccAbs.getData (), nrAccMin, nrAccMax);
+            }
+          else
+            {
+              ++nrAccUnavailable;
+            }
+          if (data.yAccAbs.isAvailable ())
+            {
+              updateLongRange (data.yAccAbs.getData (), nrAccMin, nrAccMax);
+            }
+          else
+            {
+              ++nrAccUnavailable;
+            }
+          nrHeadingMin = std::min (nrHeadingMin, data.heading);
+          nrHeadingMax = std::max (nrHeadingMax, data.heading);
+          if (data.vehicleLength.isAvailable ())
+            {
+              updateLongRange (data.vehicleLength.getData (), nrLengthMin, nrLengthMax);
+            }
+          if (data.vehicleWidth.isAvailable ())
+            {
+              updateLongRange (data.vehicleWidth.getData (), nrWidthMin, nrWidthMax);
+            }
+
+          const int64_t deltaMs =
+              (nowUs - static_cast<int64_t> (data.timestamp_us)) / 1000;
+          nrDeltaMinMs = std::min (nrDeltaMinMs, deltaMs);
+          nrDeltaMaxMs = std::max (nrDeltaMaxMs, deltaMs);
+          if (deltaMs < 0)
+            {
+              ++nrLdmMeasurementDeltaNegative;
+            }
+          if (deltaMs > 1500)
+            {
+              ++nrLdmMeasurementDeltaGt1500;
+            }
+        }
+    }
+
+  g_cpmInputDiagLog
+      << Simulator::Now ().GetSeconds () << "," << activeVehicles << ","
+      << snapshots.size () << ","
+      << (snapshots.empty () ? -1.0 : speedMin) << ","
+      << (snapshots.empty () ? -1.0 : speedSum / sampleCount) << ","
+      << (snapshots.empty () ? -1.0 : speedMax) << ","
+      << (snapshots.empty () ? -1.0 : angleMin) << ","
+      << (snapshots.empty () ? -1.0 : angleMax) << ","
+      << nearestMin << ","
+      << (snapshots.empty () ? -1.0 : static_cast<double> (sensorNeighbors) / sampleCount)
+      << ","
+      << (snapshots.empty () ? -1.0 : static_cast<double> (orrNeighbors) / sampleCount)
+      << "," << nrLdmPos << "," << nrLdmPerceivedBySelf << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrXMin) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrXMax) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrYMin) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrYMax) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrSpeedMin) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrSpeedMax) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrAccMin) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrAccMax) << ","
+      << nrAccUnavailable << ","
+      << doubleOrMinusOne (nrLdmPerceivedBySelf, nrHeadingMin) << ","
+      << doubleOrMinusOne (nrLdmPerceivedBySelf, nrHeadingMax) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrLengthMin) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrLengthMax) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrWidthMin) << ","
+      << longOrMinusOne (nrLdmPerceivedBySelf, nrWidthMax) << ","
+      << int64OrMinusOne (nrLdmPerceivedBySelf, nrDeltaMinMs) << ","
+      << int64OrMinusOne (nrLdmPerceivedBySelf, nrDeltaMaxMs) << ","
+      << nrLdmMeasurementDeltaNegative << "," << nrLdmMeasurementDeltaGt1500 << ","
+      << nrLdmDistanceAbsGt131071 << ","
+      << longOrMinusOne (nrVdpSamples, nrLatMin) << ","
+      << longOrMinusOne (nrVdpSamples, nrLatMax) << ","
+      << longOrMinusOne (nrVdpSamples, nrLonMin) << ","
+      << longOrMinusOne (nrVdpSamples, nrLonMax) << ","
+      << longOrMinusOne (nrVdpSamples, nrHeadingValueMin) << ","
+      << longOrMinusOne (nrVdpSamples, nrHeadingValueMax) << ","
+      << longOrMinusOne (nrVdpSamples, nrSpeedValueMin) << ","
+      << longOrMinusOne (nrVdpSamples, nrSpeedValueMax) << ","
+      << dsrcCpmObjects << "," << nrCpmObjects << "," << mecCpmObjects << ","
+      << dsrcCpmWannabeSent << "," << dsrcCpmSent << ","
+      << nrCpmWannabeSent << "," << nrCpmSent << ","
+      << mecCpmWannabeSent << "," << mecCpmSent << ","
+      << g_dsrcCpmStartCalls << "," << g_nrCpmStartCalls << ","
+      << g_mecCpmStartCalls << std::endl;
 }
 
 static void
@@ -2750,6 +3435,8 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                      Time interval)
 {
   uint32_t activeVehicles = 0;
+  uint32_t bgHighLoadActiveVehicles = 0;
+  uint32_t bgHighLoadAllVehicles = 0;
   uint32_t dsrcRouteCount = 0;
   uint32_t nrRouteCount = 0;
   uint32_t mecRouteCount = 0;
@@ -2765,31 +3452,53 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
   uint32_t dsrcCpmObjects = 0;
   uint32_t dsrcRmrCandidates = 0;
   uint32_t dsrcRmrDeletedLast = 0;
+  uint32_t dsrcRmrDeletedNearLast = 0;
+  uint32_t dsrcRmrDeletedFarLast = 0;
   uint32_t dsrcCpmSizeBytes = 0;
   uint64_t dsrcCpmObjectsTotal = 0;
   uint64_t dsrcRmrCandidatesTotal = 0;
   uint64_t dsrcRmrDeletedTotal = 0;
+  uint64_t dsrcRmrDeletedNearTotal = 0;
+  uint64_t dsrcRmrDeletedFarTotal = 0;
   uint64_t dsrcCpmSizeBytesTotal = 0;
+  uint64_t dsrcCpmWannabeSent = 0;
+  uint64_t dsrcCpmSent = 0;
   uint32_t nrCpmObjects = 0;
   uint32_t nrRmrCandidates = 0;
   uint32_t nrRmrDeletedLast = 0;
+  uint32_t nrRmrDeletedNearLast = 0;
+  uint32_t nrRmrDeletedFarLast = 0;
   uint32_t nrCpmSizeBytes = 0;
   uint64_t nrCpmObjectsTotal = 0;
   uint64_t nrRmrCandidatesTotal = 0;
   uint64_t nrRmrDeletedTotal = 0;
+  uint64_t nrRmrDeletedNearTotal = 0;
+  uint64_t nrRmrDeletedFarTotal = 0;
   uint64_t nrCpmSizeBytesTotal = 0;
+  uint64_t nrCpmWannabeSent = 0;
+  uint64_t nrCpmSent = 0;
   uint32_t mecCpmObjects = 0;
   uint32_t mecRmrCandidates = 0;
   uint32_t mecRmrDeletedLast = 0;
+  uint32_t mecRmrDeletedNearLast = 0;
+  uint32_t mecRmrDeletedFarLast = 0;
   uint32_t mecCpmSizeBytes = 0;
   uint64_t mecCpmObjectsTotal = 0;
   uint64_t mecRmrCandidatesTotal = 0;
   uint64_t mecRmrDeletedTotal = 0;
+  uint64_t mecRmrDeletedNearTotal = 0;
+  uint64_t mecRmrDeletedFarTotal = 0;
   uint64_t mecCpmSizeBytesTotal = 0;
+  uint64_t mecCpmWannabeSent = 0;
+  uint64_t mecCpmSent = 0;
 
   for (const auto& entry : g_vehicleRuntime)
     {
       ++activeVehicles;
+      if (IsInMovingBackgroundHighLoadZone (entry.first))
+        {
+          ++bgHighLoadActiveVehicles;
+        }
       uint32_t activeRouteCount = 0;
       if (entry.second.dsrcTxActive)
         {
@@ -2838,6 +3547,8 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
       dsrcRmrDeletedTotal += dsrcCp->getTotalRmrDeletedObjectCount ();
       dsrcCpmSizeBytes += dsrcCp->getLastCpmSizeBytes ();
       dsrcCpmSizeBytesTotal += dsrcCp->getTotalCpmSizeBytes ();
+      dsrcCpmWannabeSent += dsrcCp->getWannabeSent ();
+      dsrcCpmSent += dsrcCp->getCpmSent ();
 
       if (entry.second.nrContainer != nullptr)
         {
@@ -2850,6 +3561,8 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
           nrRmrDeletedTotal += nrCp->getTotalRmrDeletedObjectCount ();
           nrCpmSizeBytes += nrCp->getLastCpmSizeBytes ();
           nrCpmSizeBytesTotal += nrCp->getTotalCpmSizeBytes ();
+          nrCpmWannabeSent += nrCp->getWannabeSent ();
+          nrCpmSent += nrCp->getCpmSent ();
         }
 
       if (entry.second.mecContainer != nullptr)
@@ -2863,6 +3576,15 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
           mecRmrDeletedTotal += mecCp->getTotalRmrDeletedObjectCount ();
           mecCpmSizeBytes += mecCp->getLastCpmSizeBytes ();
           mecCpmSizeBytesTotal += mecCp->getTotalCpmSizeBytes ();
+          mecCpmWannabeSent += mecCp->getWannabeSent ();
+          mecCpmSent += mecCp->getCpmSent ();
+        }
+    }
+  for (const auto& entry : g_allVehicleNodes)
+    {
+      if (IsInMovingBackgroundHighLoadZone (entry.first))
+        {
+          ++bgHighLoadAllVehicles;
         }
     }
 
@@ -2910,6 +3632,15 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
   const double lowNeverReceivedRate =
       PercentFromRatioSum (g_thesisStats.lowPriorityNeverReceivedRatioSum,
                            g_thesisStats.lowPriorityNeverReceivedVehicleSamples);
+  const double mecAoiMeanMs = Mean (g_idealMecAoiSamplesMs);
+  const double mecAoiP50Ms = Percentile (g_idealMecAoiSamplesMs, 50.0);
+  const double mecAoiP90Ms = Percentile (g_idealMecAoiSamplesMs, 90.0);
+  const double mecAoiP99Ms = Percentile (g_idealMecAoiSamplesMs, 99.0);
+  const double mecCapacityDelayMeanMs = Mean (g_idealMecCapacityDelaySamplesMs);
+  const double mecCapacityDelayP90Ms = Percentile (g_idealMecCapacityDelaySamplesMs, 90.0);
+  const double mecCapacityDelayP99Ms = Percentile (g_idealMecCapacityDelaySamplesMs, 99.0);
+  const double mecRetxDelayMeanMs = Mean (g_idealMecRetxDelaySamplesMs);
+  const double mecRetxDelayP90Ms = Percentile (g_idealMecRetxDelaySamplesMs, 90.0);
 
   if (g_observationLog.is_open ())
     {
@@ -2939,23 +3670,75 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << mecMetrics->getAverageLatency_overall () << "," << mecTx << ","
                        << mecMetrics->getNumberRx_overall () << "," << dsrcCpmObjects << ","
                        << dsrcRmrCandidates << "," << dsrcRmrDeletedLast << ","
+                       << dsrcRmrDeletedNearLast << "," << dsrcRmrDeletedFarLast << ","
                        << dsrcCpmObjectsTotal << "," << dsrcRmrCandidatesTotal << ","
-                       << dsrcRmrDeletedTotal << "," << dsrcCpmSizeBytes << ","
+                       << dsrcRmrDeletedTotal << "," << dsrcRmrDeletedNearTotal << ","
+                       << dsrcRmrDeletedFarTotal << "," << dsrcCpmSizeBytes << ","
                        << dsrcCpmSizeBytesTotal << "," << nrCpmObjects << ","
                        << nrRmrCandidates << "," << nrRmrDeletedLast << ","
+                       << nrRmrDeletedNearLast << "," << nrRmrDeletedFarLast << ","
                        << nrCpmObjectsTotal << "," << nrRmrCandidatesTotal << ","
-                       << nrRmrDeletedTotal << "," << nrCpmSizeBytes << ","
+                       << nrRmrDeletedTotal << "," << nrRmrDeletedNearTotal << ","
+                       << nrRmrDeletedFarTotal << "," << nrCpmSizeBytes << ","
                        << nrCpmSizeBytesTotal << "," << mecCpmObjects << ","
                        << mecRmrCandidates << "," << mecRmrDeletedLast << ","
+                       << mecRmrDeletedNearLast << "," << mecRmrDeletedFarLast << ","
                        << mecCpmObjectsTotal << "," << mecRmrCandidatesTotal << ","
-                       << mecRmrDeletedTotal << "," << mecCpmSizeBytes << ","
-                       << mecCpmSizeBytesTotal << "," << g_camRx << "," << g_cpmRx << ","
+                       << mecRmrDeletedTotal << "," << mecRmrDeletedNearTotal << ","
+                       << mecRmrDeletedFarTotal << "," << mecCpmSizeBytes << ","
+                       << mecCpmSizeBytesTotal << ","
+                       << dsrcCpmWannabeSent << "," << dsrcCpmSent << ","
+                       << nrCpmWannabeSent << "," << nrCpmSent << ","
+                       << mecCpmWannabeSent << "," << mecCpmSent << ","
+                       << g_dsrcCpmStartCalls << "," << g_nrCpmStartCalls << ","
+                       << g_mecCpmStartCalls << ","
+                       << g_camRx << "," << g_cpmRx << ","
                        << g_interferenceTx << "," << g_interferenceBytes << ","
-                       << g_interferenceDrops << "," << g_dsrcInterferenceOfferedCbr << ","
+                       << g_interferenceDrops << "," << bgHighLoadActiveVehicles << ","
+                       << bgHighLoadAllVehicles << "," << g_dsrcInterferenceOfferedCbr << ","
                        << g_mecUplinkPackets << ","
                        << g_mecUplinkBytes << "," << g_mecForwardedPackets << ","
                        << g_mecForwardedBytes << "," << g_mecForwardDrops << ","
-                       << g_mecForwardNoReceiver << "," << FormatThesisMetric (orr) << ","
+                       << g_mecForwardNoReceiver << ","
+                       << FormatThesisMetric (mecAoiMeanMs) << ","
+                       << FormatThesisMetric (mecAoiP50Ms) << ","
+                       << FormatThesisMetric (mecAoiP90Ms) << ","
+                       << FormatThesisMetric (mecAoiP99Ms) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[0],
+                                                           g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[1],
+                                                           g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[2],
+                                                           g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[3],
+                                                           g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[0],
+                                                           g_idealMecHighAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[1],
+                                                           g_idealMecHighAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[2],
+                                                           g_idealMecHighAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[3],
+                                                           g_idealMecHighAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[0],
+                                                           g_idealMecLowAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[1],
+                                                           g_idealMecLowAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[2],
+                                                           g_idealMecLowAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[3],
+                                                           g_idealMecLowAoiSamples)) << ","
+                       << FormatThesisMetric (mecCapacityDelayMeanMs) << ","
+                       << FormatThesisMetric (mecCapacityDelayP90Ms) << ","
+                       << FormatThesisMetric (mecCapacityDelayP99Ms) << ","
+                       << g_idealMecCapacityQueueDrops << ","
+                       << g_idealMecUlFirstLosses << "," << g_idealMecDlFirstLosses << ","
+                       << g_idealMecUlRetxRecovered << "," << g_idealMecDlRetxRecovered
+                       << "," << g_idealMecUlFinalLosses << ","
+                       << g_idealMecDlFinalLosses << ","
+                       << FormatThesisMetric (mecRetxDelayMeanMs) << ","
+                       << FormatThesisMetric (mecRetxDelayP90Ms) << ","
+                       << FormatThesisMetric (orr) << ","
                        << FormatThesisMetric (highPdr) << ","
                        << FormatThesisMetric (lowPdr) << ","
                        << FormatThesisMetric (highLoss) << ","
@@ -2969,11 +3752,28 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << FormatThesisMetric (highNeverReceivedRate) << ","
                        << FormatThesisMetric (lowTtlViolationRate) << ","
                        << FormatThesisMetric (lowNeverReceivedRate) << ","
+                       << g_thesisStats.rmrDeletedEvalExpectedTotal << ","
+                       << g_thesisStats.rmrDeletedEvalExpectedHigh << ","
+                       << g_thesisStats.rmrDeletedEvalExpectedLow << ","
+                       << g_thesisStats.rmrDeletedEvalUnrecognizedTotal << ","
+                       << g_thesisStats.rmrDeletedEvalUnrecognizedHigh << ","
+                       << g_thesisStats.rmrDeletedEvalUnrecognizedLow << ","
                        << g_allVehicleNodes.size () << ","
                        << g_trafficFlowPrediction.i2vVehicleCount << ","
                        << g_trafficFlowPrediction.i2vPredictedCbrAvg << ","
                        << g_trafficFlowPrediction.i2vPredictionLeadTimeAvg << std::endl;
     }
+
+  WriteCpmInputDiagLog (activeVehicles,
+                        dsrcCpmObjects,
+                        nrCpmObjects,
+                        mecCpmObjects,
+                        dsrcCpmWannabeSent,
+                        dsrcCpmSent,
+                        nrCpmWannabeSent,
+                        nrCpmSent,
+                        mecCpmWannabeSent,
+                        mecCpmSent);
 
   Simulator::Schedule (interval,
                        &WriteObservationLog,
@@ -3280,6 +4080,31 @@ GenerateDsrcInterference (Ptr<Socket> socket,
                        config);
 }
 
+static bool
+IsInMovingBackgroundHighLoadZone (const std::string& vehicleId)
+{
+  if (!g_nrBgMovingWaveForLog || g_sumoClient == nullptr)
+    {
+      return false;
+    }
+  try
+    {
+      const double roadLength = std::max (g_trafficFlowRoadLengthMetersForLog, 1.0);
+      const double rawX = g_sumoClient->TraCIAPI::vehicle.getPosition (vehicleId).x;
+      const double x = std::fmod (std::fmod (rawX, roadLength) + roadLength, roadLength);
+      const double center =
+          std::fmod (g_nrBgWaveSpeedMpsForLog * Simulator::Now ().GetSeconds (), roadLength);
+      const double directDistance = std::abs (x - center);
+      const double wrappedDistance = std::max (0.0, roadLength - directDistance);
+      const double distance = std::min (directDistance, wrappedDistance);
+      return distance <= g_nrBgWaveWidthMetersForLog / 2.0;
+    }
+  catch (...)
+    {
+      return false;
+    }
+}
+
 static void
 StartRouteTx (VehicleRuntime& runtime, ActiveRoute route, double desync)
 {
@@ -3298,7 +4123,29 @@ StartRouteTx (VehicleRuntime& runtime, ActiveRoute route, double desync)
   container->getCABasicService ()->startCamDissemination (desync);
   if (runtime.sendCpm)
     {
-      container->getCPBasicService ()->startCpmDissemination ();
+      if (route == ActiveRoute::DsrcV2v)
+        {
+          ++g_dsrcCpmStartCalls;
+        }
+      else if (route == ActiveRoute::NrSidelinkV2v)
+        {
+          ++g_nrCpmStartCalls;
+        }
+      else
+        {
+          ++g_mecCpmStartCalls;
+        }
+      if (g_cpmStartDelaySeconds > 0.0)
+        {
+          Ptr<CPBasicService> cp = container->getCPBasicService ();
+          Simulator::Schedule (Seconds (g_cpmStartDelaySeconds),
+                               &CPBasicService::startCpmDissemination,
+                               cp);
+        }
+      else
+        {
+          container->getCPBasicService ()->startCpmDissemination ();
+        }
     }
 
   if (route == ActiveRoute::DsrcV2v)
@@ -3741,6 +4588,7 @@ main (int argc, char* argv[])
   bool enablePredictiveRmr = false;
   bool enableMecV2n2v = false;
   bool enableMecRouteControl = false;
+  bool enableMecOnly = false;
   double simTime = 120.0;
   double baselinePrR = 150.0;
   double txPower = 30.0;
@@ -3768,7 +4616,7 @@ main (int argc, char* argv[])
   double dsrcDccBitRateMbps = 6.0;
   double dsrcInterferenceStart = 1.0;
   double dsrcInterferenceStop = 0.0;
-  double dsrcInterferenceIntervalMs = 20.0;
+  double dsrcInterferenceIntervalMs = 100.0;
   uint32_t dsrcInterferencePacketSize = 1500;
   uint32_t dsrcInterferenceSourceVehicle = 3;
   uint32_t dsrcInterferenceNodeCount = 6;
@@ -3787,6 +4635,7 @@ main (int argc, char* argv[])
   uint32_t rmrDeleteMiddle = 20;
   uint32_t rmrDeleteHigh = 40;
   uint32_t rmrWindowMs = 1000;
+  bool rmrProtectNearObjects = false;
   double predictionHorizonSeconds = 20.0;
   double predictorCpmSizeNormBytes = 1200.0;
   double predictorCpmTxRateNorm = 10.0;
@@ -3835,13 +4684,25 @@ main (int argc, char* argv[])
   double mecForwardRangeMeters = 0.0;
   uint32_t mecSrsPeriodicity = 320;
   bool mecIdealLink = true;
-  double mecIdealLatencyMs = 50.0;
+  std::string mecIdealDelayModel = "empirical";
+  double mecIdealLatencyMs = 39.4;
   double mecIdealLatencyStddevMs = 20.0;
-  double mecIdealLatencyMinMs = 20.0;
-  double mecIdealLatencyMaxMs = 150.0;
+  double mecIdealLatencyMinMs = 6.1;
+  double mecIdealLatencyP90Ms = 59.86;
+  double mecIdealLatencyP99Ms = 120.33;
+  double mecIdealLatencyMaxMs = 201.0;
   double mecIdealCpmIntervalMs = 100.0;
   uint32_t mecIdealPacketSizeBytes = 500;
   double mecIdealDownlinkPdr = 1.0;
+  bool mecIdealCapacityModel = false;
+  double mecIdealBandwidthMHz = 20.0;
+  double mecIdealSpectralEfficiencyBpsHz = 4.5234;
+  double mecIdealMaxQueueDelayMs = 0.0;
+  double mecIdealUlFirstLossRate = 0.10;
+  double mecIdealDlFirstLossRate = 0.10;
+  double mecIdealRetxSuccessProbability = 0.53;
+  uint32_t mecIdealMaxRetransmissions = 4;
+  double mecIdealRetxDelayMs = 3.0;
   uint32_t maxCommunicationVehicles = 0;
 
   double centralFrequencyBandSl = 5.89e9;
@@ -3869,6 +4730,7 @@ main (int argc, char* argv[])
   std::string routeLogPath = "hybrid-cbr-route-log.csv";
   std::string cbrLogPath = "hybrid-nr-channel-log.csv";
   std::string observationLogPath = "hybrid-observation-log.csv";
+  std::string cpmInputDiagLogPath = "";
   std::string rsuPredictionLogPath = "";
   std::string summaryCsvPath = "summary.csv";
   std::string method = "legacy";
@@ -3880,6 +4742,9 @@ main (int argc, char* argv[])
   cmd.AddValue ("verbose", "Enable verbose legacy V2V logging", verbose);
   cmd.AddValue ("sumo-gui", "Show SUMO GUI", sumoGui);
   cmd.AddValue ("send-cpm", "Enable CPM dissemination in addition to CAM", sendCpm);
+  cmd.AddValue ("cpm-start-delay",
+                "Delay CPM dissemination start after route activation [s]",
+                g_cpmStartDelaySeconds);
   cmd.AddValue ("enable-dcc", "Enable ETSI DCC on the legacy V2V route", enableDcc);
   cmd.AddValue ("route-control", "Enable legacy route-control mode; unused in NR-only evaluation", enableRouteControl);
   cmd.AddValue ("dsrc-dcc-bitrate-mbps", "Legacy DCC bitrate; unused in NR-only evaluation", dsrcDccBitRateMbps);
@@ -3933,6 +4798,9 @@ main (int argc, char* argv[])
   cmd.AddValue ("rmr-delete-middle", "Objects deleted per CPM in middle CBR phase", rmrDeleteMiddle);
   cmd.AddValue ("rmr-delete-high", "Objects deleted per CPM in high CBR phase", rmrDeleteHigh);
   cmd.AddValue ("rmr-window-ms", "Time window used for Frequency-based RMR observation count", rmrWindowMs);
+  cmd.AddValue ("rmr-protect-near-objects",
+                "Exclude objects within --priority-distance from RMR deletion candidates",
+                rmrProtectNearObjects);
   cmd.AddValue ("rmr-weight-frequency", "Weight for Frequency-based RMR term", rmrWeightFrequency);
   cmd.AddValue ("rmr-weight-dynamics", "Weight for Dynamics-based RMR terms", rmrWeightDynamics);
   cmd.AddValue ("rmr-weight-distance", "Weight for Distance-based RMR term", rmrWeightDistance);
@@ -4070,12 +4938,21 @@ main (int argc, char* argv[])
   cmd.AddValue ("mec-ideal-latency-ms",
                 "Mean V2N2V latency [ms] used by --mec-ideal-link",
                 mecIdealLatencyMs);
+  cmd.AddValue ("mec-ideal-delay-model",
+                "Abstract MEC V2N2V delay model: empirical or normal",
+                mecIdealDelayModel);
   cmd.AddValue ("mec-ideal-latency-stddev-ms",
                 "Standard deviation [ms] for abstract MEC V2N2V latency; 0 keeps it fixed",
                 mecIdealLatencyStddevMs);
   cmd.AddValue ("mec-ideal-latency-min-ms",
                 "Minimum clipped abstract MEC V2N2V latency [ms]",
                 mecIdealLatencyMinMs);
+  cmd.AddValue ("mec-ideal-latency-p90-ms",
+                "90th percentile [ms] for empirical abstract MEC V2N2V latency",
+                mecIdealLatencyP90Ms);
+  cmd.AddValue ("mec-ideal-latency-p99-ms",
+                "99th percentile [ms] for empirical abstract MEC V2N2V latency",
+                mecIdealLatencyP99Ms);
   cmd.AddValue ("mec-ideal-latency-max-ms",
                 "Maximum clipped abstract MEC V2N2V latency [ms]",
                 mecIdealLatencyMaxMs);
@@ -4088,6 +4965,33 @@ main (int argc, char* argv[])
   cmd.AddValue ("mec-ideal-dl-pdr",
                 "Abstract MEC downlink packet delivery ratio; 1.0 means lossless",
                 mecIdealDownlinkPdr);
+  cmd.AddValue ("mec-ideal-capacity-model",
+                "Serialize abstract MEC UL/DL packets by configured Uu capacities",
+                mecIdealCapacityModel);
+  cmd.AddValue ("mec-ideal-bandwidth-mhz",
+                "Abstract MEC Uu bandwidth [MHz] used for UL/DL capacity proxy",
+                mecIdealBandwidthMHz);
+  cmd.AddValue ("mec-ideal-spectral-efficiency-bpshz",
+                "Spectral efficiency [bit/s/Hz] used for the MEC Uu capacity proxy",
+                mecIdealSpectralEfficiencyBpsHz);
+  cmd.AddValue ("mec-ideal-max-queue-delay-ms",
+                "Drop abstract MEC packets whose capacity delay exceeds this value; 0 disables",
+                mecIdealMaxQueueDelayMs);
+  cmd.AddValue ("mec-ideal-ul-first-loss-rate",
+                "Abstract Uu uplink first-transmission loss probability before retransmission",
+                mecIdealUlFirstLossRate);
+  cmd.AddValue ("mec-ideal-dl-first-loss-rate",
+                "Abstract Uu downlink first-transmission loss probability before retransmission",
+                mecIdealDlFirstLossRate);
+  cmd.AddValue ("mec-ideal-retx-success-prob",
+                "Success probability of each abstract HARQ/RLC-style retransmission",
+                mecIdealRetxSuccessProbability);
+  cmd.AddValue ("mec-ideal-max-retx",
+                "Maximum abstract retransmissions after a first Uu transmission loss",
+                mecIdealMaxRetransmissions);
+  cmd.AddValue ("mec-ideal-retx-delay-ms",
+                "Additional delay [ms] per abstract retransmission attempt",
+                mecIdealRetxDelayMs);
   cmd.AddValue ("max-communication-vehicles",
                 "Maximum number of SUMO vehicles that run CAM/CPM/V2X applications; 0 means all",
                 maxCommunicationVehicles);
@@ -4106,6 +5010,9 @@ main (int argc, char* argv[])
   cmd.AddValue ("cbr-log", "CSV file for MetricSupervisor CBR values", cbrLogPath);
   cmd.AddValue ("route-log", "CSV file for route switching events", routeLogPath);
   cmd.AddValue ("observation-log", "CSV file for CBR/PRR/loss/route-count time series", observationLogPath);
+  cmd.AddValue ("cpm-input-diag-log",
+                "Optional CSV file for CPM input diagnostics visible from the example",
+                cpmInputDiagLogPath);
   cmd.AddValue ("rsu-prediction-log",
                 "CSV file for per-RSU measured/predicted CBR time series",
                 rsuPredictionLogPath);
@@ -4164,6 +5071,15 @@ main (int argc, char* argv[])
       enableRouteControl = false;
       enableMecV2n2v = true;
       enableMecRouteControl = true;
+    }
+  else if (method == "v2n2v-only")
+    {
+      enableReactiveRmr = false;
+      enablePredictiveRmr = false;
+      enableRouteControl = false;
+      enableMecV2n2v = true;
+      enableMecRouteControl = false;
+      enableMecOnly = true;
     }
   else if (method == "cbr-route-nr-sidelink")
     {
@@ -4267,6 +5183,10 @@ main (int argc, char* argv[])
     {
       NS_FATAL_ERROR ("invalid NR moving-wave background parameters");
     }
+  g_nrBgMovingWaveForLog = nrBgMovingWave;
+  g_nrBgWaveSpeedMpsForLog = nrBgWaveSpeedMps;
+  g_nrBgWaveWidthMetersForLog = nrBgWaveWidthMeters;
+  g_trafficFlowRoadLengthMetersForLog = trafficFlowRoadLengthMeters;
   if (enableDsrcInterference && !dsrcInterferencePerVehicle && dsrcInterferenceNodeCount < 2)
     {
       NS_FATAL_ERROR ("dsrc-interference-nodes must be at least 2 for unicast traffic");
@@ -4328,6 +5248,10 @@ main (int argc, char* argv[])
     {
       NS_FATAL_ERROR ("mec-ideal-latency-ms must be greater than or equal to 0");
     }
+  if (mecIdealDelayModel != "empirical" && mecIdealDelayModel != "normal")
+    {
+      NS_FATAL_ERROR ("mec-ideal-delay-model must be empirical or normal");
+    }
   if (mecIdealLatencyStddevMs < 0.0)
     {
       NS_FATAL_ERROR ("mec-ideal-latency-stddev-ms must be greater than or equal to 0");
@@ -4336,9 +5260,21 @@ main (int argc, char* argv[])
     {
       NS_FATAL_ERROR ("mec-ideal-latency-min-ms must be greater than or equal to 0");
     }
+  if (mecIdealLatencyP90Ms < mecIdealLatencyMinMs)
+    {
+      NS_FATAL_ERROR ("mec-ideal-latency-p90-ms must be greater than or equal to min");
+    }
+  if (mecIdealLatencyP99Ms < mecIdealLatencyP90Ms)
+    {
+      NS_FATAL_ERROR ("mec-ideal-latency-p99-ms must be greater than or equal to p90");
+    }
   if (mecIdealLatencyMaxMs < mecIdealLatencyMinMs)
     {
       NS_FATAL_ERROR ("mec-ideal-latency-max-ms must be greater than or equal to min");
+    }
+  if (mecIdealLatencyMaxMs < mecIdealLatencyP99Ms)
+    {
+      NS_FATAL_ERROR ("mec-ideal-latency-max-ms must be greater than or equal to p99");
     }
   if (mecIdealCpmIntervalMs <= 0.0)
     {
@@ -4351,6 +5287,34 @@ main (int argc, char* argv[])
   if (mecIdealDownlinkPdr < 0.0 || mecIdealDownlinkPdr > 1.0)
     {
       NS_FATAL_ERROR ("mec-ideal-dl-pdr must be within [0, 1]");
+    }
+  if (mecIdealBandwidthMHz <= 0.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-bandwidth-mhz must be greater than 0");
+    }
+  if (mecIdealSpectralEfficiencyBpsHz <= 0.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-spectral-efficiency-bpshz must be greater than 0");
+    }
+  if (mecIdealMaxQueueDelayMs < 0.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-max-queue-delay-ms must be greater than or equal to 0");
+    }
+  if (mecIdealUlFirstLossRate < 0.0 || mecIdealUlFirstLossRate > 1.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-ul-first-loss-rate must be within [0, 1]");
+    }
+  if (mecIdealDlFirstLossRate < 0.0 || mecIdealDlFirstLossRate > 1.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-dl-first-loss-rate must be within [0, 1]");
+    }
+  if (mecIdealRetxSuccessProbability < 0.0 || mecIdealRetxSuccessProbability > 1.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-retx-success-prob must be within [0, 1]");
+    }
+  if (mecIdealRetxDelayMs < 0.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-retx-delay-ms must be greater than or equal to 0");
     }
   if (mecAdaptiveLowMaxProbability < 0.0 || mecAdaptiveLowMaxProbability > 1.0)
     {
@@ -4410,18 +5374,38 @@ main (int argc, char* argv[])
   g_mecObjectPolicy = ParseMecObjectPolicy (mecObjectPolicyName);
   g_mecAdaptiveLowMaxProbability = mecAdaptiveLowMaxProbability;
   g_idealMecLatency = MilliSeconds (mecIdealLatencyMs);
+  g_idealMecDelayModel = mecIdealDelayModel;
   g_idealMecLatencyMeanMs = mecIdealLatencyMs;
   g_idealMecLatencyStddevMs = mecIdealLatencyStddevMs;
   g_idealMecLatencyMinMs = mecIdealLatencyMinMs;
+  g_idealMecLatencyP90Ms = mecIdealLatencyP90Ms;
+  g_idealMecLatencyP99Ms = mecIdealLatencyP99Ms;
   g_idealMecLatencyMaxMs = mecIdealLatencyMaxMs;
   g_idealMecLatencyRv = CreateObject<NormalRandomVariable> ();
   g_idealMecLatencyRv->SetAttribute ("Mean", DoubleValue (g_idealMecLatencyMeanMs));
   g_idealMecLatencyRv->SetAttribute ("Variance",
                                      DoubleValue (g_idealMecLatencyStddevMs *
                                                   g_idealMecLatencyStddevMs));
+  g_idealMecLatencyUniformRv = CreateObject<UniformRandomVariable> ();
+  g_idealMecLatencyUniformRv->SetAttribute ("Min", DoubleValue (0.0));
+  g_idealMecLatencyUniformRv->SetAttribute ("Max", DoubleValue (1.0));
+  g_idealMecLatencyUniformRv->SetStream (hybridRoutingStream + 3);
   g_idealMecInterval = MilliSeconds (mecIdealCpmIntervalMs);
   g_idealMecPacketSizeBytes = mecIdealPacketSizeBytes;
   g_idealMecDownlinkPdr = mecIdealDownlinkPdr;
+  g_idealMecCapacityModel = mecIdealCapacityModel;
+  g_idealMecBandwidthMHz = mecIdealBandwidthMHz;
+  g_idealMecSpectralEfficiencyBpsHz = mecIdealSpectralEfficiencyBpsHz;
+  g_idealMecUplinkCapacityMbps =
+      g_idealMecBandwidthMHz * g_idealMecSpectralEfficiencyBpsHz;
+  g_idealMecDownlinkCapacityMbps =
+      g_idealMecBandwidthMHz * g_idealMecSpectralEfficiencyBpsHz;
+  g_idealMecMaxQueueDelayMs = mecIdealMaxQueueDelayMs;
+  g_idealMecUlFirstLossRate = mecIdealUlFirstLossRate;
+  g_idealMecDlFirstLossRate = mecIdealDlFirstLossRate;
+  g_idealMecRetxSuccessProbability = mecIdealRetxSuccessProbability;
+  g_idealMecMaxRetransmissions = mecIdealMaxRetransmissions;
+  g_idealMecRetxDelayMs = mecIdealRetxDelayMs;
   g_maxCommunicationVehicles = maxCommunicationVehicles;
   g_priorityDistanceThresholdMeters = priorityDistanceMeters;
   g_priorityClosingSpeedThresholdMps = priorityClosingSpeedMps;
@@ -4465,6 +5449,10 @@ main (int argc, char* argv[])
   g_idealMecDownlinkRandom->SetAttribute ("Min", DoubleValue (0.0));
   g_idealMecDownlinkRandom->SetAttribute ("Max", DoubleValue (1.0));
   g_idealMecDownlinkRandom->SetStream (hybridRoutingStream + 1);
+  g_idealMecRadioRandom = CreateObject<UniformRandomVariable> ();
+  g_idealMecRadioRandom->SetAttribute ("Min", DoubleValue (0.0));
+  g_idealMecRadioRandom->SetAttribute ("Max", DoubleValue (1.0));
+  g_idealMecRadioRandom->SetStream (hybridRoutingStream + 2);
 
   if (realtime)
     {
@@ -4624,9 +5612,11 @@ main (int argc, char* argv[])
 
   NodeContainer vehicleNodes;
   vehicleNodes.Create (numberOfNodes);
+  std::cout << "Setup progress: vehicle nodes created" << std::endl;
 
   MobilityHelper mobility;
   mobility.Install (vehicleNodes);
+  std::cout << "Setup progress: mobility installed" << std::endl;
 
   Ptr<NrHelper> mecNrHelper;
   Ptr<NrPointToPointEpcHelper> mecEpcHelper;
@@ -4746,6 +5736,7 @@ main (int argc, char* argv[])
                                       "NonUnicastMode",
                                       StringValue (phyMode));
   NetDeviceContainer dsrcDevices = wifi80211p.Install (wifiPhy, wifi80211pMac, vehicleNodes);
+  std::cout << "Setup progress: 802.11p devices installed" << std::endl;
   if (enablePcap)
     {
       wifiPhy.EnablePcap ("v2v-hybrid-cbr-80211p", dsrcDevices);
@@ -4768,6 +5759,7 @@ main (int argc, char* argv[])
 
   if (enableNrSidelinkV2v)
     {
+  std::cout << "Setup progress: NR sidelink setup begin" << std::endl;
   nrEpcHelper = CreateObject<NrPointToPointEpcHelper> ();
   nrHelper = CreateObject<NrHelper> ();
   nrHelper->SetEpcHelper (nrEpcHelper);
@@ -4799,6 +5791,7 @@ main (int argc, char* argv[])
 
   nrHelper->InitializeOperationBand (&bandSl);
   BandwidthPartInfoPtrVector allBwps = CcBwpCreator::GetAllBwps ({bandSl});
+  std::cout << "Setup progress: NR operation band initialized" << std::endl;
 
   nrHelper->SetUeAntennaAttribute ("NumRows", UintegerValue (1));
   nrHelper->SetUeAntennaAttribute ("NumColumns", UintegerValue (2));
@@ -4825,6 +5818,7 @@ main (int argc, char* argv[])
   bwpIdContainer.insert (bwpIdForGbrMcptt);
 
   nrDevices = nrHelper->InstallUeDevice (vehicleNodes, allBwps);
+  std::cout << "Setup progress: NR UE devices installed" << std::endl;
   for (auto it = nrDevices.Begin (); it != nrDevices.End (); ++it)
     {
       DynamicCast<NrUeNetDevice> (*it)->UpdateConfig ();
@@ -4838,6 +5832,7 @@ main (int argc, char* argv[])
   nrSlHelper->SetUeSlSchedulerAttribute ("FixNrSlMcs", BooleanValue (true));
   nrSlHelper->SetUeSlSchedulerAttribute ("InitialNrSlMcs", UintegerValue (mcs));
   nrSlHelper->PrepareUeForSidelink (nrDevices, bwpIdContainer);
+  std::cout << "Setup progress: NR sidelink UEs prepared" << std::endl;
 
   Ptr<NrSlCommPreconfigResourcePoolFactory> poolFactory =
       Create<NrSlCommPreconfigResourcePoolFactory> ();
@@ -4905,6 +5900,7 @@ main (int argc, char* argv[])
   slPreConfig.slUeSelectedPreConfig = slUeSelectedPreConfig;
   slPreConfig.slPreconfigFreqInfoList[0] = slFreqConfig;
   nrSlHelper->InstallNrSlPreConfiguration (nrDevices, slPreConfig);
+  std::cout << "Setup progress: NR sidelink preconfiguration installed" << std::endl;
 
   int64_t stream = 1;
   stream += nrHelper->AssignStreams (nrDevices, stream);
@@ -4913,6 +5909,7 @@ main (int argc, char* argv[])
 
   InternetStackHelper internet;
   internet.Install (vehicleNodes);
+  std::cout << "Setup progress: internet stack installed" << std::endl;
 
   Ipv4StaticRoutingHelper ipv4RoutingHelper;
   if (enableMecV2n2v && !g_useIdealMecLink)
@@ -4937,6 +5934,7 @@ main (int argc, char* argv[])
     {
       Ipv4InterfaceContainer nrIpIfaces = nrEpcHelper->AssignUeIpv4Address (nrDevices);
       (void) nrIpIfaces;
+      std::cout << "Setup progress: NR IPv4 addresses assigned" << std::endl;
       for (uint32_t i = 0; i < vehicleNodes.GetN (); ++i)
         {
           Ptr<Ipv4StaticRouting> ueStaticRouting =
@@ -4973,6 +5971,7 @@ main (int argc, char* argv[])
                               nrGroupAddress,
                               dstL2Id);
       nrSlHelper->ActivateNrSlBearer (slBearersActivationTime, nrDevices, tft);
+      std::cout << "Setup progress: NR sidelink bearers activated" << std::endl;
     }
 
   std::vector<Ptr<Socket>> dsrcInterferenceSockets;
@@ -5048,7 +6047,9 @@ main (int argc, char* argv[])
     }
   if (enableNrSidelinkV2v)
     {
+      std::cout << "Setup progress: NR CBR monitor start" << std::endl;
       nrMetrics->startCheckCBR (numberOfNodes);
+      std::cout << "Setup progress: NR CBR monitor ready" << std::endl;
     }
 
   Ptr<MetricSupervisor> channelMetrics = enableNrSidelinkV2v ? nrMetrics : dsrcMetrics;
@@ -5074,6 +6075,8 @@ main (int argc, char* argv[])
 
   OpenRouteLog (routeLogPath);
   OpenObservationLog (observationLogPath);
+  OpenCpmInputDiagLog (cpmInputDiagLogPath);
+  std::cout << "Setup progress: CSV logs opened" << std::endl;
   if (!rsuPredictionLogPath.empty ())
     {
       g_rsuPredictionLog.open (rsuPredictionLogPath, std::ios::out);
@@ -5267,7 +6270,14 @@ main (int argc, char* argv[])
     g_vehicleRuntime[vehicleId] = runtime;
     UpdateDsrcInterferenceOfferedCbr ();
 
-    ActivateRoute (vehicleId, ActiveRoute::NrSidelinkV2v, -1.0, "initial_nr_sidelink_route", true);
+    if (enableMecOnly)
+      {
+        ActivateRoute (vehicleId, ActiveRoute::MecV2n2v, -1.0, "initial_mec_v2n2v_only", true);
+      }
+    else
+      {
+        ActivateRoute (vehicleId, ActiveRoute::NrSidelinkV2v, -1.0, "initial_nr_sidelink_route", true);
+      }
     if (enableDsrcInterference &&
         (dsrcInterferencePerVehicle || stationId <= dsrcInterferenceNodeCount))
       {
@@ -5361,7 +6371,9 @@ main (int argc, char* argv[])
     UpdateDsrcInterferenceOfferedCbr ();
   };
 
+  std::cout << "Setup progress: SUMO setup begin" << std::endl;
   sumoClient->SumoSetup (setupNewVehicle, shutdownVehicle);
+  std::cout << "Setup progress: SUMO setup complete" << std::endl;
   if (g_holdTrafficUntilEvaluationStart)
     {
       Simulator::Schedule (MilliSeconds (100), &HoldTrafficUntilEvaluationStart);
@@ -5540,6 +6552,15 @@ main (int argc, char* argv[])
   const double mecLatencyP99 =
       g_useIdealMecLink ? Percentile (g_idealMecLatencySamplesMs, 99.0)
                         : mecMetrics->getLatencyPercentile_messagetype (cpmType, 99.0);
+  const double mecAoiMeanMs = Mean (g_idealMecAoiSamplesMs);
+  const double mecAoiP50Ms = Percentile (g_idealMecAoiSamplesMs, 50.0);
+  const double mecAoiP90Ms = Percentile (g_idealMecAoiSamplesMs, 90.0);
+  const double mecAoiP99Ms = Percentile (g_idealMecAoiSamplesMs, 99.0);
+  const double mecCapacityDelayMeanMs = Mean (g_idealMecCapacityDelaySamplesMs);
+  const double mecCapacityDelayP90Ms = Percentile (g_idealMecCapacityDelaySamplesMs, 90.0);
+  const double mecCapacityDelayP99Ms = Percentile (g_idealMecCapacityDelaySamplesMs, 99.0);
+  const double mecRetxDelayMeanMs = Mean (g_idealMecRetxDelaySamplesMs);
+  const double mecRetxDelayP90Ms = Percentile (g_idealMecRetxDelaySamplesMs, 90.0);
   const double effectiveChannelBusyRatio =
       static_cast<double> (channelMetrics->getAverageCBROverall ());
   std::cout << "Thesis 4.3 recognition rate (%): "
@@ -5615,6 +6636,32 @@ main (int argc, char* argv[])
   std::cout << "MEC V2N2V CPM latency percentiles (ms): p50="
             << mecLatencyP50 << ", p90=" << mecLatencyP90 << ", p95=" << mecLatencyP95
             << ", p99=" << mecLatencyP99 << std::endl;
+  std::cout << "MEC V2N2V AoI from CPM generation (ms): mean="
+            << mecAoiMeanMs << ", p50=" << mecAoiP50Ms << ", p90=" << mecAoiP90Ms
+            << ", p99=" << mecAoiP99Ms << std::endl;
+  std::cout << "MEC V2N2V AoI threshold success (%): <=50="
+            << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[0],
+                                                g_idealMecAoiSamples))
+            << ", <=100="
+            << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[1],
+                                                g_idealMecAoiSamples))
+            << ", <=200="
+            << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[2],
+                                                g_idealMecAoiSamples))
+            << ", <=500="
+            << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[3],
+                                                g_idealMecAoiSamples))
+            << std::endl;
+  std::cout << "MEC V2N2V capacity delay (ms): mean="
+            << mecCapacityDelayMeanMs << ", p90=" << mecCapacityDelayP90Ms
+            << ", p99=" << mecCapacityDelayP99Ms
+            << ", queue-drops=" << g_idealMecCapacityQueueDrops << std::endl;
+  std::cout << "MEC V2N2V radio loss/retransmission: UL first/final/recovered="
+            << g_idealMecUlFirstLosses << "/" << g_idealMecUlFinalLosses << "/"
+            << g_idealMecUlRetxRecovered << ", DL first/final/recovered="
+            << g_idealMecDlFirstLosses << "/" << g_idealMecDlFinalLosses << "/"
+            << g_idealMecDlRetxRecovered << ", retx-delay mean/p90(ms)="
+            << mecRetxDelayMeanMs << "/" << mecRetxDelayP90Ms << std::endl;
   std::cout << "MEC uplink/forward/drop/no-receiver: " << g_mecUplinkPackets << "/"
             << g_mecForwardedPackets << "/" << g_mecForwardDrops << "/"
             << g_mecForwardNoReceiver << std::endl;
@@ -5656,7 +6703,20 @@ main (int argc, char* argv[])
           << "sensor_external_event_count,sensor_external_event_recognized,"
           << "sensor_external_event_missed,sensor_external_event_censored,"
           << "sensor_external_event_recognition_rate,"
-          << "sensor_external_event_delay_mean_ms,sensor_external_event_delay_p50_ms"
+          << "sensor_external_event_delay_mean_ms,sensor_external_event_delay_p50_ms,"
+          << "mec_aoi_mean_ms,mec_aoi_p50_ms,mec_aoi_p90_ms,mec_aoi_p99_ms,"
+          << "mec_aoi_le_50_ms_rate,mec_aoi_le_100_ms_rate,"
+          << "mec_aoi_le_200_ms_rate,mec_aoi_le_500_ms_rate,"
+          << "mec_high_aoi_le_50_ms_rate,mec_high_aoi_le_100_ms_rate,"
+          << "mec_high_aoi_le_200_ms_rate,mec_high_aoi_le_500_ms_rate,"
+          << "mec_low_aoi_le_50_ms_rate,mec_low_aoi_le_100_ms_rate,"
+          << "mec_low_aoi_le_200_ms_rate,mec_low_aoi_le_500_ms_rate,"
+          << "mec_capacity_delay_mean_ms,mec_capacity_delay_p90_ms,"
+          << "mec_capacity_delay_p99_ms,mec_capacity_queue_drops,"
+          << "mec_ul_first_losses,mec_dl_first_losses,"
+          << "mec_ul_retx_recovered,mec_dl_retx_recovered,"
+          << "mec_ul_final_losses,mec_dl_final_losses,"
+          << "mec_retx_delay_mean_ms,mec_retx_delay_p90_ms"
           << std::endl;
       summaryCsv << method << "," << FormatThesisMetric (recognitionRate) << ","
                  << FormatThesisMetric (highPriorityObjectRecognitionRate) << ","
@@ -5702,7 +6762,44 @@ main (int argc, char* argv[])
                  << sensorExternalEventCensored << ","
                  << FormatThesisMetric (sensorExternalEventRecognitionRate) << ","
                  << FormatThesisMetric (sensorExternalEventDelayMeanMs) << ","
-                 << FormatThesisMetric (sensorExternalEventDelayP50Ms) << std::endl;
+                 << FormatThesisMetric (sensorExternalEventDelayP50Ms) << ","
+                 << FormatThesisMetric (mecAoiMeanMs) << ","
+                 << FormatThesisMetric (mecAoiP50Ms) << ","
+                 << FormatThesisMetric (mecAoiP90Ms) << ","
+                 << FormatThesisMetric (mecAoiP99Ms) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[0],
+                                                     g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[1],
+                                                     g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[2],
+                                                     g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[3],
+                                                     g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[0],
+                                                     g_idealMecHighAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[1],
+                                                     g_idealMecHighAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[2],
+                                                     g_idealMecHighAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[3],
+                                                     g_idealMecHighAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[0],
+                                                     g_idealMecLowAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[1],
+                                                     g_idealMecLowAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[2],
+                                                     g_idealMecLowAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[3],
+                                                     g_idealMecLowAoiSamples)) << ","
+                 << FormatThesisMetric (mecCapacityDelayMeanMs) << ","
+                 << FormatThesisMetric (mecCapacityDelayP90Ms) << ","
+                 << FormatThesisMetric (mecCapacityDelayP99Ms) << ","
+                 << g_idealMecCapacityQueueDrops << ","
+                 << g_idealMecUlFirstLosses << "," << g_idealMecDlFirstLosses << ","
+                 << g_idealMecUlRetxRecovered << "," << g_idealMecDlRetxRecovered << ","
+                 << g_idealMecUlFinalLosses << "," << g_idealMecDlFinalLosses << ","
+                 << FormatThesisMetric (mecRetxDelayMeanMs) << ","
+                 << FormatThesisMetric (mecRetxDelayP90Ms) << std::endl;
     }
 
   if (g_routeLog.is_open ())
