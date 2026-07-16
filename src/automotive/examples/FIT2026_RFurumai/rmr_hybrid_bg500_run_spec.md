@@ -44,10 +44,11 @@ Confirm:
 git log --oneline --decorate -n 3
 ```
 
-The latest commit should include:
+The latest commits should include:
 
 ```text
-47d69751 0716
+Enable hybrid traffic-flow prediction without RMR
+Enable reactive RMR for hybrid evaluation
 ```
 
 ## Run Command
@@ -69,7 +70,7 @@ nohup env \
   MOB_TRACE="$ROU" \
   SUMO_CONFIG="$CFG" \
   OUT_DIR="$OUT" \
-  SUMO_PORT=19180 \
+  SUMO_PORT=19200 \
   SUMO_SYNC_INTERVAL=0.1 \
   MAX_COMMUNICATION_VEHICLES=200 \
   THESIS_EVAL_START_MIN_VEHICLES=200 \
@@ -81,6 +82,7 @@ nohup env \
   PREDICTOR_CPM_SIZE_WEIGHT=0 \
   PREDICTOR_CPM_TX_RATE_WEIGHT=0 \
   PREDICTOR_ACTIVE_VEHICLE_WEIGHT=0 \
+  TRAFFIC_FLOW_RSU_PREDICTOR=false \
   RSU_I2V_RANGE=300 \
   SENSOR_RANGE=30 \
   ORR_RANGE=200 \
@@ -127,13 +129,13 @@ nohup env \
 ## Process Check
 
 ```bash
-ps -ef | grep -E 'v2v-hybrid-nr-v2n2v|sumo.*19180|ns3 run' | grep -v grep
+ps -ef | grep -E 'v2v-hybrid-nr-v2n2v|sumo.*19200|ns3 run' | grep -v grep
 ```
 
 Expected:
 
 - One `ns3-dev-v2v-hybrid-nr-v2n2v-optimized` process
-- One `sumo ... --remote-port 19180` process
+- One `sumo ... --remote-port 19200` process
 - Output path includes `results/bg500_hybrid_rmr_seed30_100s/v2n2v-adaptive-probability`
 
 ## Progress Check
