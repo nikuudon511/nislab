@@ -64,6 +64,23 @@ MEC_IDEAL_DL_FIRST_LOSS_RATE=${MEC_IDEAL_DL_FIRST_LOSS_RATE:-0.10}
 MEC_IDEAL_RETX_SUCCESS_PROB=${MEC_IDEAL_RETX_SUCCESS_PROB:-0.53}
 MEC_IDEAL_MAX_RETX=${MEC_IDEAL_MAX_RETX:-4}
 MEC_IDEAL_RETX_DELAY_MS=${MEC_IDEAL_RETX_DELAY_MS:-3}
+MEC_IDEAL_AOI_FILTER=${MEC_IDEAL_AOI_FILTER:-false}
+MEC_IDEAL_AOI_FILTER_THRESHOLD_MS=${MEC_IDEAL_AOI_FILTER_THRESHOLD_MS:-200}
+MEC_BG=${MEC_BG:-false}
+MEC_BG_PER_VEHICLE=${MEC_BG_PER_VEHICLE:-true}
+MEC_BG_SIZE=${MEC_BG_SIZE:-500}
+MEC_BG_INTERVAL_MS=${MEC_BG_INTERVAL_MS:-100}
+SUMO_SCREENSHOT_DIR=${SUMO_SCREENSHOT_DIR:-}
+SUMO_SCREENSHOT_VIEW=${SUMO_SCREENSHOT_VIEW:-View #0}
+SUMO_SCREENSHOT_INTERVAL=${SUMO_SCREENSHOT_INTERVAL:-0}
+SUMO_SCREENSHOT_START=${SUMO_SCREENSHOT_START:-0}
+SUMO_SCREENSHOT_STOP=${SUMO_SCREENSHOT_STOP:-0}
+SUMO_SCREENSHOT_CENTER_X=${SUMO_SCREENSHOT_CENTER_X:-1500}
+SUMO_SCREENSHOT_CENTER_Y=${SUMO_SCREENSHOT_CENTER_Y:-38}
+SUMO_SCREENSHOT_SPAN_X=${SUMO_SCREENSHOT_SPAN_X:-900}
+SUMO_SCREENSHOT_SPAN_Y=${SUMO_SCREENSHOT_SPAN_Y:-180}
+SUMO_SCREENSHOT_WIDTH=${SUMO_SCREENSHOT_WIDTH:-1600}
+SUMO_SCREENSHOT_HEIGHT=${SUMO_SCREENSHOT_HEIGHT:-900}
 MAX_COMMUNICATION_VEHICLES=${MAX_COMMUNICATION_VEHICLES:-100}
 
 PRIORITY_DISTANCE=${PRIORITY_DISTANCE:-100}
@@ -137,17 +154,36 @@ for method in $METHODS; do
       run_mec_object_policy="high-priority-only"
       ;;
     v2n2v-adaptive-probability)
-      run_method="predictive-rmr-v2n2v"
+      run_method="hybrid-v2v-v2n2v"
       run_mec_object_policy="adaptive-probability"
       ;;
   esac
 
   RUN_DIR="$OUT_DIR/$method"
   mkdir -p "$RUN_DIR"
+  if [ -n "$SUMO_SCREENSHOT_DIR" ]; then
+    mkdir -p "$SUMO_SCREENSHOT_DIR"
+  fi
+  screenshot_args=""
+  if [ -n "$SUMO_SCREENSHOT_DIR" ]; then
+    screenshot_args="\
+    --sumo-screenshot-dir=\"$SUMO_SCREENSHOT_DIR\" \
+    --sumo-screenshot-view=\"$SUMO_SCREENSHOT_VIEW\" \
+    --sumo-screenshot-interval=$SUMO_SCREENSHOT_INTERVAL \
+    --sumo-screenshot-start=$SUMO_SCREENSHOT_START \
+    --sumo-screenshot-stop=$SUMO_SCREENSHOT_STOP \
+    --sumo-screenshot-center-x=$SUMO_SCREENSHOT_CENTER_X \
+    --sumo-screenshot-center-y=$SUMO_SCREENSHOT_CENTER_Y \
+    --sumo-screenshot-span-x=$SUMO_SCREENSHOT_SPAN_X \
+    --sumo-screenshot-span-y=$SUMO_SCREENSHOT_SPAN_Y \
+    --sumo-screenshot-width=$SUMO_SCREENSHOT_WIDTH \
+    --sumo-screenshot-height=$SUMO_SCREENSHOT_HEIGHT"
+  fi
 
   /usr/bin/time -v -o "$RUN_DIR/resource_usage.txt" ./ns3 run "v2v-hybrid-nr-v2n2v \
     --method=$run_method \
     --sumo-gui=${SUMO_GUI:-false} \
+    $screenshot_args \
     --sim-time=$SIM_TIME \
     --sumo-folder=$SUMO_FOLDER \
     --mob-trace=$MOB_TRACE \
@@ -204,6 +240,12 @@ for method in $METHODS; do
     --mec-ideal-retx-success-prob=$MEC_IDEAL_RETX_SUCCESS_PROB \
     --mec-ideal-max-retx=$MEC_IDEAL_MAX_RETX \
     --mec-ideal-retx-delay-ms=$MEC_IDEAL_RETX_DELAY_MS \
+    --mec-ideal-aoi-filter=$MEC_IDEAL_AOI_FILTER \
+    --mec-ideal-aoi-filter-threshold-ms=$MEC_IDEAL_AOI_FILTER_THRESHOLD_MS \
+    --mec-bg=$MEC_BG \
+    --mec-bg-per-vehicle=$MEC_BG_PER_VEHICLE \
+    --mec-bg-size=$MEC_BG_SIZE \
+    --mec-bg-interval-ms=$MEC_BG_INTERVAL_MS \
     --max-communication-vehicles=$MAX_COMMUNICATION_VEHICLES \
     --priority-distance=$PRIORITY_DISTANCE \
     --priority-closing-speed=$PRIORITY_CLOSING_SPEED \
@@ -244,6 +286,12 @@ for method in $METHODS; do
     --cpm-input-diag-log=$RUN_DIR/cpm_input_diag.csv \
     --rsu-prediction-log=$RUN_DIR/rsu_prediction.csv \
     --summary-csv=$RUN_DIR/summary.csv" > "$RUN_DIR/stdout.txt" 2>&1
+
+  if [[ ! -s "$RUN_DIR/summary.csv" ]]; then
+    echo "Warning: missing or empty summary for $method: $RUN_DIR/summary.csv" >&2
+    run_port=$((run_port + 1))
+    continue
+  fi
 
   if [[ "$header_written" == false ]]; then
     head -n 1 "$RUN_DIR/summary.csv" > "$SUMMARY"

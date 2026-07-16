@@ -284,21 +284,66 @@ Required AoI logs:
 - AoI achievement rate for 50/100/200/500 ms.
 - High-priority AoI achievement rate for 50/100/200/500 ms.
 - Low-priority AoI achievement rate for 50/100/200/500 ms.
+- AoI violation rate for each threshold.  This is the complement of the AoI
+  achievement rate among received MEC updates, not a radio packet-loss rate.
 - Capacity queue drops as the first implemented deadline-related drop signal.
 
 ## 6. Drop Reasons
 
-Packet loss and update failure must be decomposed by cause.
+Packet loss, stale updates, and recognition-state failures must be decomposed by
+cause.  They must not be reported as one undifferentiated packet-loss rate.
 
 Required drop categories:
 
-- Uplink radio loss.
-- Downlink radio loss.
+- Uplink radio loss: a Uu uplink transmission that still fails after the
+  configured retransmission attempts.
+- Downlink radio loss: a Uu downlink transmission that still fails after the
+  configured retransmission attempts.
 - Queue overflow.
 - Capacity deadline miss.
-- AoI/TTL expired before delivery.
+- AoI violation: a received update whose generation-time-based AoI is larger
+  than the selected threshold.  The packet was received, but it is stale.
+- TTL violation: an object-recognition state that was not refreshed within the
+  recognition TTL.  This is an application-level recognition failure, not a
+  radio packet loss.
 - No receiver in forwarding range.
 - Policy-filtered object.
+- Never received: an object that was expected for recognition but has never
+  been received by the evaluating vehicle.  This is a diagnostic category for
+  explaining ORR degradation; it should not be treated as a primary packet-loss
+  metric because it may include range, routing, policy, and radio effects.
+
+Recommended reporting groups:
+
+- Radio reliability: V2V sidelink radio loss, V2V high/low-priority sidelink
+  radio loss, MEC UL final radio loss, MEC DL final radio loss, and combined
+  MEC radio final loss.
+- Update success/failure: V2V update failure and MEC update failure.  These are
+  application-level expected-update outcomes and must be kept separate from
+  final radio loss counters.
+- Freshness: AoI violation rates for 200/300/400/500 ms.
+- Recognition continuity: TTL violation rate.
+- Diagnostics: never-received rate and no-receiver forwarding count.
+
+### 6.1 MEC Forwarding Range Sensitivity
+
+`MEC_FORWARD_RANGE` is the service/application range used by the MEC to select
+which nearby vehicles receive forwarded cooperative-perception updates.  It is
+not modeled as the Uu radio propagation distance between UE and gNB.
+
+Therefore, the 200 m / 500 m sensitivity analysis should be explained as a
+MEC delivery-scope and downlink-fanout sensitivity analysis.  Increasing the
+range mainly increases the number of downlink receivers, downlink bytes,
+downlink busy ratio, queueing delay, AoI violations, and TTL violations.  In the
+current lightweight V2N2V model, distance-dependent Uu SINR/BLER is not
+explicitly modeled, so any degradation observed at 500 m should not be claimed
+as direct distance-propagation loss.
+
+For the current evaluation, it is acceptable to prioritize bandwidth/fanout
+congestion over distance-dependent V2N2V packet loss, because the modeled
+MEC range changes the number of forwarded receivers much more directly than it
+changes Uu radio distance.  If distance-dependent Uu loss is needed, a separate
+UE-gNB distance/SINR or distance-bin loss model must be added.
 
 ## 7. Comparison Methods
 

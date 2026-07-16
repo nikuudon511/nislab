@@ -37,7 +37,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <limits>
 #include <numeric>
 #include <set>
@@ -123,6 +125,14 @@ struct ThesisEvaluationStats
   uint64_t nrIdealCpmRx = 0;
   uint64_t nrTrueCpmRx = 0;
   uint64_t mecIdealCpmRx = 0;
+  std::array<double, 4> v2vAoiRecognitionRatioSum = {{0.0, 0.0, 0.0, 0.0}};
+  std::array<uint64_t, 4> v2vAoiRecognitionVehicleSamples = {{0, 0, 0, 0}};
+  std::array<double, 4> v2vOnlyAoiRecognitionRatioSum = {{0.0, 0.0, 0.0, 0.0}};
+  std::array<uint64_t, 4> v2vOnlyAoiRecognitionVehicleSamples = {{0, 0, 0, 0}};
+  std::array<double, 4> mecAoiRecognitionRatioSum = {{0.0, 0.0, 0.0, 0.0}};
+  std::array<uint64_t, 4> mecAoiRecognitionVehicleSamples = {{0, 0, 0, 0}};
+  std::array<double, 4> mecOnlyAoiRecognitionRatioSum = {{0.0, 0.0, 0.0, 0.0}};
+  std::array<uint64_t, 4> mecOnlyAoiRecognitionVehicleSamples = {{0, 0, 0, 0}};
   uint64_t mecTrueCpmRx = 0;
   uint64_t idealMecLastHighAttempts = 0;
   uint64_t idealMecLastHighSuccesses = 0;
@@ -142,6 +152,10 @@ struct ThesisEvaluationStats
   uint64_t highTrueCpmRx = 0;
   uint64_t lowIdealCpmRx = 0;
   uint64_t lowTrueCpmRx = 0;
+  uint64_t nrHighIdealCpmRx = 0;
+  uint64_t nrHighTrueCpmRx = 0;
+  uint64_t nrLowIdealCpmRx = 0;
+  uint64_t nrLowTrueCpmRx = 0;
   std::unordered_map<std::string, uint64_t> dsrcLastCpmTxByVehicle;
   std::unordered_map<std::string, uint64_t> nrLastCpmTxByVehicle;
   std::unordered_map<std::string, uint64_t> mecLastCpmTxByVehicle;
@@ -335,7 +349,13 @@ static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>> g_latest
 static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
     g_latestNrCpmRxByReceiver;
 static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
+    g_latestNrCpmGenerationTimeByReceiver;
+static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
     g_latestMecCpmRxByReceiver;
+static std::array<std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>, 4>
+    g_latestMecCpmRxByReceiverAoiThreshold;
+static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
+    g_latestMecCpmGenerationTimeByReceiver;
 static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
     g_latestActualCpmObjectRxByReceiver;
 static uint64_t g_interferenceTx = 0;
@@ -349,6 +369,12 @@ static uint64_t g_mecUplinkPackets = 0;
 static uint64_t g_mecUplinkBytes = 0;
 static uint64_t g_mecForwardedPackets = 0;
 static uint64_t g_mecForwardedBytes = 0;
+static uint64_t g_lastMecUplinkBytesForBusyRatio = 0;
+static uint64_t g_lastMecForwardedBytesForBusyRatio = 0;
+static uint64_t g_mecBackgroundUplinkBytes = 0;
+static uint64_t g_mecBackgroundDownlinkBytes = 0;
+static std::vector<double> g_mecUlBusyRatioSamples;
+static std::vector<double> g_mecDlBusyRatioSamples;
 static uint64_t g_mecForwardDrops = 0;
 static uint64_t g_mecForwardNoReceiver = 0;
 static uint64_t g_idealMecTx = 0;
@@ -397,13 +423,22 @@ static Ptr<NormalRandomVariable> g_idealMecLatencyRv;
 static Ptr<UniformRandomVariable> g_idealMecLatencyUniformRv;
 static std::vector<double> g_idealMecLatencySamplesMs;
 static std::vector<double> g_idealMecAoiSamplesMs;
+static std::vector<double> g_v2vAoiSamplesMs;
+static uint64_t g_v2vAoiSamples = 0;
+static std::array<uint64_t, 4> g_v2vAoiWithinThreshold = {{0, 0, 0, 0}};
 static uint64_t g_idealMecAoiSamples = 0;
 static uint64_t g_idealMecHighAoiSamples = 0;
 static uint64_t g_idealMecLowAoiSamples = 0;
 static std::array<uint64_t, 4> g_idealMecAoiWithinThreshold = {{0, 0, 0, 0}};
 static std::array<uint64_t, 4> g_idealMecHighAoiWithinThreshold = {{0, 0, 0, 0}};
 static std::array<uint64_t, 4> g_idealMecLowAoiWithinThreshold = {{0, 0, 0, 0}};
-static const std::array<double, 4> g_idealMecAoiThresholdsMs = {{50.0, 100.0, 200.0, 500.0}};
+static const std::array<double, 4> g_idealMecAoiThresholdsMs = {{200.0, 300.0, 400.0, 500.0}};
+static bool g_idealMecAoiFilter = false;
+static double g_idealMecAoiFilterThresholdMs = 200.0;
+static bool g_mecBackgroundLoad = false;
+static bool g_mecBackgroundPerVehicle = true;
+static uint32_t g_mecBackgroundPacketSizeBytes = 500;
+static Time g_mecBackgroundInterval = MilliSeconds (100);
 static std::unordered_map<uint32_t, std::string> g_mecVehicleIdByIp;
 static std::unordered_map<std::string, Ipv4Address> g_mecIpByVehicleId;
 static Ptr<TraciClient> g_sumoClient;
@@ -616,6 +651,19 @@ ReceiveCPM (asn1cpp::Seq<CollectivePerceptionMessage> cpm,
           : (route == ActiveRoute::MecV2n2v ? &g_latestMecCpmRxByReceiver : nullptr);
   const uint64_t receiverStationId = static_cast<uint64_t> (myStationId);
   const Time now = Simulator::Now ();
+  Time generatedAt = now;
+  if (route == ActiveRoute::NrSidelinkV2v && phyInfo.timestamp > 0.0)
+    {
+      generatedAt = NanoSeconds (static_cast<int64_t> (phyInfo.timestamp));
+      if (generatedAt > now)
+        {
+          generatedAt = now;
+        }
+    }
+  const double v2vAoiMs =
+      route == ActiveRoute::NrSidelinkV2v
+          ? std::max (0.0, static_cast<double> ((now - generatedAt).GetMilliSeconds ()))
+          : 0.0;
   if (cpm->header.stationId > 0 &&
       static_cast<uint64_t> (cpm->header.stationId) != receiverStationId)
     {
@@ -625,6 +673,21 @@ ReceiveCPM (asn1cpp::Seq<CollectivePerceptionMessage> cpm,
       if (routeUpdates != nullptr)
         {
           (*routeUpdates)[receiverStationId][static_cast<uint64_t> (cpm->header.stationId)] = now;
+          if (route == ActiveRoute::NrSidelinkV2v)
+            {
+              g_latestNrCpmGenerationTimeByReceiver[receiverStationId]
+                                                    [static_cast<uint64_t> (cpm->header.stationId)] =
+                                                        generatedAt;
+              g_v2vAoiSamplesMs.push_back (v2vAoiMs);
+              ++g_v2vAoiSamples;
+              for (std::size_t i = 0; i < g_idealMecAoiThresholdsMs.size (); ++i)
+                {
+                  if (v2vAoiMs <= g_idealMecAoiThresholdsMs[i])
+                    {
+                      ++g_v2vAoiWithinThreshold[i];
+                    }
+                }
+            }
           const int containerCount =
               asn1cpp::sequenceof::getSize (cpm->payload.cpmContainers);
           for (int i = 0; i < containerCount; ++i)
@@ -655,6 +718,12 @@ ReceiveCPM (asn1cpp::Seq<CollectivePerceptionMessage> cpm,
                       g_latestActualCpmObjectRxByReceiver[receiverStationId]
                                                           [static_cast<uint64_t> (objectId)] = now;
                       (*routeUpdates)[receiverStationId][static_cast<uint64_t> (objectId)] = now;
+                      if (route == ActiveRoute::NrSidelinkV2v)
+                        {
+                          g_latestNrCpmGenerationTimeByReceiver[receiverStationId]
+                                                                [static_cast<uint64_t> (objectId)] =
+                                                                    generatedAt;
+                        }
                     }
                 }
             }
@@ -740,11 +809,31 @@ VehicleIdToStationId (const std::string& vehicleId)
 }
 
 static void
+MarkCpmObjectsRecognizedByReceiver (
+    uint64_t receiverStationId,
+    uint64_t senderStationId,
+    Time now,
+    std::unordered_map<uint64_t, Time>& recognized);
+
+static void
 MarkCpmObjectsRecognizedByReceiver (uint64_t receiverStationId,
                                     uint64_t senderStationId,
                                     Time now)
 {
   auto& recognized = g_latestCpmRxByReceiver[receiverStationId];
+  MarkCpmObjectsRecognizedByReceiver (receiverStationId,
+                                      senderStationId,
+                                      now,
+                                      recognized);
+}
+
+static void
+MarkCpmObjectsRecognizedByReceiver (
+    uint64_t receiverStationId,
+    uint64_t senderStationId,
+    Time now,
+    std::unordered_map<uint64_t, Time>& recognized)
+{
   recognized[senderStationId] = now;
 
   const auto senderVehicleIt = g_vehicleIdByStationId.find (senderStationId);
@@ -1091,46 +1180,45 @@ DeliverIdealMecCpmBatch (uint64_t senderStationId,
           ++g_mecForwardDrops;
           continue;
         }
-      MarkCpmObjectsRecognizedByReceiver (receiverStationId, senderStationId, now);
-      g_latestActualCpmObjectRxByReceiver[receiverStationId][senderStationId] = now;
-      const auto senderVehicleIt = g_vehicleIdByStationId.find (senderStationId);
-      if (senderVehicleIt != g_vehicleIdByStationId.end ())
+      const bool aoiAccepted =
+          !g_idealMecAoiFilter || aoiMs <= g_idealMecAoiFilterThresholdMs;
+      MarkCpmObjectsRecognizedByReceiver (
+          receiverStationId,
+          senderStationId,
+          generatedAt,
+          g_latestMecCpmGenerationTimeByReceiver[receiverStationId]);
+      std::array<bool, 4> aoiThresholdAccepted = {{false, false, false, false}};
+      for (std::size_t i = 0; i < g_idealMecAoiThresholdsMs.size (); ++i)
         {
-          const auto senderNodeIt = g_allVehicleNodes.find (senderVehicleIt->second);
-          Ptr<MobilityModel> senderMobility =
-              senderNodeIt != g_allVehicleNodes.end () && senderNodeIt->second != nullptr
-                  ? senderNodeIt->second->GetObject<MobilityModel> ()
-                  : nullptr;
-          if (senderMobility != nullptr)
+          aoiThresholdAccepted[i] = aoiMs <= g_idealMecAoiThresholdsMs[i];
+          if (aoiThresholdAccepted[i])
             {
-              for (const auto& objectEntry : g_allVehicleNodes)
-                {
-                  if (objectEntry.second == nullptr)
-                    {
-                      continue;
-                    }
-                  const uint64_t objectStationId = VehicleIdToStationId (objectEntry.first);
-                  Ptr<MobilityModel> objectMobility =
-                      objectEntry.second->GetObject<MobilityModel> ();
-                  if (objectStationId != receiverStationId && objectMobility != nullptr &&
-                      senderMobility->GetDistanceFrom (objectMobility) <= g_sensorRangeMeters)
-                    {
-                      g_latestActualCpmObjectRxByReceiver[receiverStationId][objectStationId] =
-                          now;
-                    }
-                }
+              MarkCpmObjectsRecognizedByReceiver (
+                  receiverStationId,
+                  senderStationId,
+                  now,
+                  g_latestMecCpmRxByReceiverAoiThreshold[i][receiverStationId]);
             }
         }
-      g_latestMecCpmRxByReceiver[receiverStationId][senderStationId] = now;
+      if (aoiAccepted)
+        {
+          MarkCpmObjectsRecognizedByReceiver (receiverStationId, senderStationId, now);
+          MarkCpmObjectsRecognizedByReceiver (
+              receiverStationId,
+              senderStationId,
+              now,
+              g_latestActualCpmObjectRxByReceiver[receiverStationId]);
+          g_latestMecCpmRxByReceiver[receiverStationId][senderStationId] = now;
+          if (receiver.second)
+            {
+              ++g_idealMecHighSuccesses;
+            }
+          else
+            {
+              ++g_idealMecLowSuccesses;
+            }
+        }
       ++g_idealMecRx;
-      if (receiver.second)
-        {
-          ++g_idealMecHighSuccesses;
-        }
-      else
-        {
-          ++g_idealMecLowSuccesses;
-        }
       g_idealMecLatencySamplesMs.push_back (latencyMs);
       g_idealMecAoiSamplesMs.push_back (aoiMs);
       ++g_idealMecAoiSamples;
@@ -1214,6 +1302,39 @@ ReserveIdealMecCapacity (Time arrivalTime, uint32_t bytes, double capacityMbps, 
   const Time finish = start + Seconds (transmissionSeconds);
   availableAt = finish;
   return finish - arrivalTime;
+}
+
+static void
+GenerateIdealMecBackgroundLoad ()
+{
+  if (!g_mecBackgroundLoad)
+    {
+      return;
+    }
+
+  const uint64_t packets =
+      g_mecBackgroundPerVehicle
+          ? static_cast<uint64_t> (std::max<std::size_t> (g_vehicleRuntime.size (), 0))
+          : 1;
+  const uint64_t bytes = packets * static_cast<uint64_t> (g_mecBackgroundPacketSizeBytes);
+  const Time now = Simulator::Now ();
+  if (bytes > 0)
+    {
+      g_mecBackgroundUplinkBytes += bytes;
+      g_mecBackgroundDownlinkBytes += bytes;
+      ReserveIdealMecCapacity (now,
+                               static_cast<uint32_t> (std::min<uint64_t> (
+                                   bytes, std::numeric_limits<uint32_t>::max ())),
+                               g_idealMecUplinkCapacityMbps,
+                               g_idealMecUplinkAvailableAt);
+      ReserveIdealMecCapacity (now,
+                               static_cast<uint32_t> (std::min<uint64_t> (
+                                   bytes, std::numeric_limits<uint32_t>::max ())),
+                               g_idealMecDownlinkCapacityMbps,
+                               g_idealMecDownlinkAvailableAt);
+    }
+
+  Simulator::Schedule (g_mecBackgroundInterval, &GenerateIdealMecBackgroundLoad);
 }
 
 static void
@@ -1508,6 +1629,63 @@ PercentRate (uint64_t numerator, uint64_t denominator)
   return denominator > 0 ? 100.0 * static_cast<double> (numerator) /
                                static_cast<double> (denominator)
                          : 0.0;
+}
+
+static double
+PercentMissRate (uint64_t withinThreshold, uint64_t total)
+{
+  return total > 0 && total >= withinThreshold ? PercentRate (total - withinThreshold, total) : 0.0;
+}
+
+struct SumoScreenshotConfig
+{
+  std::string dir;
+  std::string viewId = "View #0";
+  double centerX = 1500.0;
+  double centerY = 38.0;
+  double spanX = 900.0;
+  double spanY = 180.0;
+  int width = 1600;
+  int height = 900;
+  double intervalSeconds = 0.0;
+  double stopSeconds = 0.0;
+};
+
+static void
+CaptureSumoGuiScreenshot (Ptr<TraciClient> sumoClient, SumoScreenshotConfig config)
+{
+  const double now = Simulator::Now ().GetSeconds ();
+  try
+    {
+      if (config.spanX > 0.0 && config.spanY > 0.0)
+        {
+          sumoClient->TraCIAPI::gui.setBoundary (config.viewId,
+                                                 config.centerX - config.spanX / 2.0,
+                                                 config.centerY - config.spanY / 2.0,
+                                                 config.centerX + config.spanX / 2.0,
+                                                 config.centerY + config.spanY / 2.0);
+        }
+      std::ostringstream filename;
+      filename << config.dir << "/sumo_t" << std::setw (5) << std::setfill ('0')
+               << static_cast<int> (std::lround (now * 10.0)) << ".png";
+      sumoClient->TraCIAPI::gui.screenshot (config.viewId,
+                                            filename.str (),
+                                            config.width,
+                                            config.height);
+      std::cout << "SUMO GUI screenshot: " << filename.str () << std::endl;
+    }
+  catch (const std::exception& e)
+    {
+      std::cerr << "SUMO GUI screenshot failed at t=" << now << "s: " << e.what ()
+                << std::endl;
+    }
+  if (config.intervalSeconds > 0.0 && now + config.intervalSeconds <= config.stopSeconds + 1e-9)
+    {
+      Simulator::Schedule (Seconds (config.intervalSeconds),
+                           &CaptureSumoGuiScreenshot,
+                           sumoClient,
+                           config);
+    }
 }
 
 static Ptr<BSContainer>
@@ -2082,6 +2260,83 @@ AccumulateThesisRecognitionSample ()
 
       std::set<uint64_t> recognizedStationIds = sensorRecognizedStationIds;
       recognizedStationIds.insert (cpmRecognizedStationIds.begin (), cpmRecognizedStationIds.end ());
+      std::array<std::set<uint64_t>, 4> v2vAoiRecognizedStationIds;
+      for (std::size_t i = 0; i < g_idealMecAoiThresholdsMs.size (); ++i)
+        {
+          v2vAoiRecognizedStationIds[i] = sensorRecognizedStationIds;
+          std::set<uint64_t> v2vOnlyAoiRecognizedStationIds;
+          const auto nrGenerationIt =
+              g_latestNrCpmGenerationTimeByReceiver.find (selfStationId);
+          if (nrGenerationIt != g_latestNrCpmGenerationTimeByReceiver.end ())
+            {
+              for (const auto& rxEntry : nrGenerationIt->second)
+                {
+                  if (expectedStationIds.count (rxEntry.first) > 0 &&
+                      (now - rxEntry.second).GetMilliSeconds () <=
+                          g_idealMecAoiThresholdsMs[i])
+                    {
+                      v2vAoiRecognizedStationIds[i].insert (rxEntry.first);
+                      v2vOnlyAoiRecognizedStationIds.insert (rxEntry.first);
+                    }
+                }
+            }
+          uint32_t v2vAoiRecognizedObjects = 0;
+          for (const uint64_t stationId : v2vAoiRecognizedStationIds[i])
+            {
+              if (expectedStationIds.count (stationId) > 0)
+                {
+                  ++v2vAoiRecognizedObjects;
+                }
+            }
+          g_thesisStats.v2vAoiRecognitionRatioSum[i] +=
+              Clamp01 (static_cast<double> (v2vAoiRecognizedObjects) /
+                       static_cast<double> (expectedStationIds.size ()));
+          ++g_thesisStats.v2vAoiRecognitionVehicleSamples[i];
+          g_thesisStats.v2vOnlyAoiRecognitionRatioSum[i] +=
+              Clamp01 (static_cast<double> (v2vOnlyAoiRecognizedStationIds.size ()) /
+                       static_cast<double> (expectedStationIds.size ()));
+          ++g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[i];
+        }
+      std::array<std::set<uint64_t>, 4> mecAoiRecognizedStationIds;
+      for (std::size_t i = 0; i < g_idealMecAoiThresholdsMs.size (); ++i)
+        {
+          mecAoiRecognizedStationIds[i] = recognizedStationIds;
+          std::set<uint64_t> mecOnlyAoiRecognizedStationIds;
+          const auto mecGenerationIt =
+              g_latestMecCpmGenerationTimeByReceiver.find (selfStationId);
+          if (mecGenerationIt != g_latestMecCpmGenerationTimeByReceiver.end ())
+            {
+              for (const auto& rxEntry : mecGenerationIt->second)
+                {
+                  if (expectedStationIds.count (rxEntry.first) == 0)
+                    {
+                      continue;
+                    }
+                  if ((now - rxEntry.second).GetMilliSeconds () <=
+                      g_idealMecAoiThresholdsMs[i])
+                    {
+                      mecAoiRecognizedStationIds[i].insert (rxEntry.first);
+                      mecOnlyAoiRecognizedStationIds.insert (rxEntry.first);
+                    }
+                }
+            }
+          uint32_t mecAoiRecognizedObjects = 0;
+          for (const uint64_t stationId : mecAoiRecognizedStationIds[i])
+            {
+              if (expectedStationIds.count (stationId) > 0)
+                {
+                  ++mecAoiRecognizedObjects;
+                }
+            }
+          g_thesisStats.mecAoiRecognitionRatioSum[i] +=
+              Clamp01 (static_cast<double> (mecAoiRecognizedObjects) /
+                       static_cast<double> (expectedStationIds.size ()));
+          ++g_thesisStats.mecAoiRecognitionVehicleSamples[i];
+          g_thesisStats.mecOnlyAoiRecognitionRatioSum[i] +=
+              Clamp01 (static_cast<double> (mecOnlyAoiRecognizedStationIds.size ()) /
+                       static_cast<double> (expectedStationIds.size ()));
+          ++g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[i];
+        }
       uint32_t recognizedObjects = 0;
       uint32_t highPriorityRecognizedObjects = 0;
       uint32_t lowPriorityRecognizedObjects = 0;
@@ -2375,6 +2630,10 @@ AccumulateThesisPacketLossCounters (Ptr<MetricSupervisor> dsrcMetrics,
   g_thesisStats.lowIdealCpmRx += dsrcLowIdealDelta + nrLowIdealDelta + mecLowIdealDelta;
   g_thesisStats.highTrueCpmRx += dsrcHighTrueDelta + nrHighTrueDelta + mecHighTrueDelta;
   g_thesisStats.lowTrueCpmRx += dsrcLowTrueDelta + nrLowTrueDelta + mecLowTrueDelta;
+  g_thesisStats.nrHighIdealCpmRx += nrHighIdealDelta;
+  g_thesisStats.nrHighTrueCpmRx += nrHighTrueDelta;
+  g_thesisStats.nrLowIdealCpmRx += nrLowIdealDelta;
+  g_thesisStats.nrLowTrueCpmRx += nrLowTrueDelta;
 }
 
 static void
@@ -3078,21 +3337,46 @@ OpenObservationLog (const std::string& path)
       << "bg_high_load_active_vehicles,bg_high_load_all_vehicles,"
       << "interference_offered_cbr,"
       << "mec_uplink_packets,mec_uplink_bytes,mec_forwarded_packets,"
-      << "mec_forwarded_bytes,mec_forward_drops,mec_forward_no_receiver,"
+      << "mec_forwarded_bytes,mec_bg_ul_bytes,mec_bg_dl_bytes,"
+      << "mec_ul_capacity_mbps,mec_dl_capacity_mbps,"
+      << "mec_ul_bytes_delta,mec_dl_bytes_delta,"
+      << "mec_ul_offered_mbps,mec_dl_offered_mbps,"
+      << "mec_ul_busy_ratio,mec_dl_busy_ratio,"
+      << "mec_forward_drops,mec_forward_no_receiver,"
+      << "v2v_aoi_mean_ms,v2v_aoi_p50_ms,v2v_aoi_p90_ms,v2v_aoi_p99_ms,"
+      << "v2v_aoi_le_200_ms_rate,v2v_aoi_le_300_ms_rate,"
+      << "v2v_aoi_le_400_ms_rate,v2v_aoi_le_500_ms_rate,"
+      << "v2v_aoi_violation_rate_200ms,v2v_aoi_violation_rate_300ms,"
+      << "v2v_aoi_violation_rate_400ms,v2v_aoi_violation_rate_500ms,"
+      << "v2v_aoi_orr_le_200_ms,v2v_aoi_orr_le_300_ms,"
+      << "v2v_aoi_orr_le_400_ms,v2v_aoi_orr_le_500_ms,"
+      << "v2v_only_aoi_orr_le_200_ms,v2v_only_aoi_orr_le_300_ms,"
+      << "v2v_only_aoi_orr_le_400_ms,v2v_only_aoi_orr_le_500_ms,"
       << "mec_aoi_mean_ms,mec_aoi_p50_ms,mec_aoi_p90_ms,mec_aoi_p99_ms,"
-      << "mec_aoi_le_50_ms_rate,mec_aoi_le_100_ms_rate,"
-      << "mec_aoi_le_200_ms_rate,mec_aoi_le_500_ms_rate,"
-      << "mec_high_aoi_le_50_ms_rate,mec_high_aoi_le_100_ms_rate,"
-      << "mec_high_aoi_le_200_ms_rate,mec_high_aoi_le_500_ms_rate,"
-      << "mec_low_aoi_le_50_ms_rate,mec_low_aoi_le_100_ms_rate,"
-      << "mec_low_aoi_le_200_ms_rate,mec_low_aoi_le_500_ms_rate,"
+      << "mec_aoi_le_200_ms_rate,mec_aoi_le_300_ms_rate,"
+      << "mec_aoi_le_400_ms_rate,mec_aoi_le_500_ms_rate,"
+      << "mec_aoi_violation_rate_200ms,mec_aoi_violation_rate_300ms,"
+      << "mec_aoi_violation_rate_400ms,mec_aoi_violation_rate_500ms,"
+      << "mec_high_aoi_le_200_ms_rate,mec_high_aoi_le_300_ms_rate,"
+      << "mec_high_aoi_le_400_ms_rate,mec_high_aoi_le_500_ms_rate,"
+      << "mec_low_aoi_le_200_ms_rate,mec_low_aoi_le_300_ms_rate,"
+      << "mec_low_aoi_le_400_ms_rate,mec_low_aoi_le_500_ms_rate,"
+      << "mec_aoi_orr_le_200_ms,mec_aoi_orr_le_300_ms,"
+      << "mec_aoi_orr_le_400_ms,mec_aoi_orr_le_500_ms,"
+      << "mec_only_aoi_orr_le_200_ms,mec_only_aoi_orr_le_300_ms,"
+      << "mec_only_aoi_orr_le_400_ms,mec_only_aoi_orr_le_500_ms,"
       << "mec_capacity_delay_mean_ms,mec_capacity_delay_p90_ms,"
       << "mec_capacity_delay_p99_ms,mec_capacity_queue_drops,"
       << "mec_ul_first_losses,mec_dl_first_losses,"
       << "mec_ul_retx_recovered,mec_dl_retx_recovered,"
       << "mec_ul_final_losses,mec_dl_final_losses,"
+      << "mec_fresh_update_loss_rate,mec_update_failure_rate,"
+      << "mec_valid_update_success_rate,mec_ul_final_loss_rate,"
+      << "mec_dl_final_loss_rate,mec_radio_final_loss_rate,"
       << "mec_retx_delay_mean_ms,mec_retx_delay_p90_ms,"
       << "orr,high_pdr,low_pdr,high_packet_loss,low_packet_loss,"
+      << "v2v_radio_loss_rate,v2v_high_radio_loss_rate,v2v_low_radio_loss_rate,"
+      << "v2v_update_failure_rate,"
       << "high_ideal_rx,high_true_rx,low_ideal_rx,low_true_rx,"
       << "ttl_violation_rate,never_received_rate,"
       << "high_ttl_violation_rate,high_never_received_rate,"
@@ -3614,6 +3898,28 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
       ThesisPacketLossRatePercent (g_thesisStats.highIdealCpmRx, g_thesisStats.highTrueCpmRx);
   const double lowLoss =
       ThesisPacketLossRatePercent (g_thesisStats.lowIdealCpmRx, g_thesisStats.lowTrueCpmRx);
+  const double v2vRadioLoss =
+      ThesisPacketLossRatePercent (g_thesisStats.nrIdealCpmRx, g_thesisStats.nrTrueCpmRx);
+  const double v2vHighRadioLoss =
+      ThesisPacketLossRatePercent (g_thesisStats.nrHighIdealCpmRx,
+                                   g_thesisStats.nrHighTrueCpmRx);
+  const double v2vLowRadioLoss =
+      ThesisPacketLossRatePercent (g_thesisStats.nrLowIdealCpmRx, g_thesisStats.nrLowTrueCpmRx);
+  const double v2vUpdateFailureRate =
+      ThesisPacketLossRatePercent (g_thesisStats.nrUpdateExpected,
+                                   g_thesisStats.nrUpdateSuccess);
+  const double mecUpdateFailureRate =
+      ThesisPacketLossRatePercent (g_thesisStats.mecUpdateExpected,
+                                   g_thesisStats.mecUpdateSuccess);
+  const double mecValidUpdateSuccessRate =
+      PercentRate (g_thesisStats.mecUpdateSuccess, g_thesisStats.mecUpdateExpected);
+  const double mecUlFinalLossRate =
+      PercentRate (g_idealMecUlFinalLosses, g_mecUplinkPackets);
+  const double mecDlFinalLossRate =
+      PercentRate (g_idealMecDlFinalLosses, g_mecForwardedPackets);
+  const double mecRadioFinalLossRate =
+      PercentRate (g_idealMecUlFinalLosses + g_idealMecDlFinalLosses,
+                   g_mecUplinkPackets + g_mecForwardedPackets);
   const double ttlViolationRate =
       PercentFromRatioSum (g_thesisStats.ttlViolationRatioSum,
                            g_thesisStats.ttlViolationVehicleSamples);
@@ -3632,6 +3938,10 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
   const double lowNeverReceivedRate =
       PercentFromRatioSum (g_thesisStats.lowPriorityNeverReceivedRatioSum,
                            g_thesisStats.lowPriorityNeverReceivedVehicleSamples);
+  const double v2vAoiMeanMs = Mean (g_v2vAoiSamplesMs);
+  const double v2vAoiP50Ms = Percentile (g_v2vAoiSamplesMs, 50.0);
+  const double v2vAoiP90Ms = Percentile (g_v2vAoiSamplesMs, 90.0);
+  const double v2vAoiP99Ms = Percentile (g_v2vAoiSamplesMs, 99.0);
   const double mecAoiMeanMs = Mean (g_idealMecAoiSamplesMs);
   const double mecAoiP50Ms = Percentile (g_idealMecAoiSamplesMs, 50.0);
   const double mecAoiP90Ms = Percentile (g_idealMecAoiSamplesMs, 90.0);
@@ -3641,6 +3951,33 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
   const double mecCapacityDelayP99Ms = Percentile (g_idealMecCapacityDelaySamplesMs, 99.0);
   const double mecRetxDelayMeanMs = Mean (g_idealMecRetxDelaySamplesMs);
   const double mecRetxDelayP90Ms = Percentile (g_idealMecRetxDelaySamplesMs, 90.0);
+  const double observationWindowSeconds = std::max (interval.GetSeconds (), 1.0e-9);
+  const uint64_t mecUlBytesForBusyRatio = g_mecUplinkBytes + g_mecBackgroundUplinkBytes;
+  const uint64_t mecDlBytesForBusyRatio = g_mecForwardedBytes + g_mecBackgroundDownlinkBytes;
+  const uint64_t mecUlBytesDelta =
+      mecUlBytesForBusyRatio >= g_lastMecUplinkBytesForBusyRatio
+          ? mecUlBytesForBusyRatio - g_lastMecUplinkBytesForBusyRatio
+          : 0;
+  const uint64_t mecDlBytesDelta =
+      mecDlBytesForBusyRatio >= g_lastMecForwardedBytesForBusyRatio
+          ? mecDlBytesForBusyRatio - g_lastMecForwardedBytesForBusyRatio
+          : 0;
+  g_lastMecUplinkBytesForBusyRatio = mecUlBytesForBusyRatio;
+  g_lastMecForwardedBytesForBusyRatio = mecDlBytesForBusyRatio;
+  const double mecUlOfferedMbps =
+      (static_cast<double> (mecUlBytesDelta) * 8.0) / observationWindowSeconds / 1.0e6;
+  const double mecDlOfferedMbps =
+      (static_cast<double> (mecDlBytesDelta) * 8.0) / observationWindowSeconds / 1.0e6;
+  const double mecUlBusyRatio =
+      g_idealMecUplinkCapacityMbps > 0.0
+          ? Clamp01 (mecUlOfferedMbps / g_idealMecUplinkCapacityMbps)
+          : 0.0;
+  const double mecDlBusyRatio =
+      g_idealMecDownlinkCapacityMbps > 0.0
+          ? Clamp01 (mecDlOfferedMbps / g_idealMecDownlinkCapacityMbps)
+          : 0.0;
+  g_mecUlBusyRatioSamples.push_back (mecUlBusyRatio);
+  g_mecDlBusyRatioSamples.push_back (mecDlBusyRatio);
 
   if (g_observationLog.is_open ())
     {
@@ -3698,8 +4035,62 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << bgHighLoadAllVehicles << "," << g_dsrcInterferenceOfferedCbr << ","
                        << g_mecUplinkPackets << ","
                        << g_mecUplinkBytes << "," << g_mecForwardedPackets << ","
-                       << g_mecForwardedBytes << "," << g_mecForwardDrops << ","
+                       << g_mecForwardedBytes << ","
+                       << g_mecBackgroundUplinkBytes << ","
+                       << g_mecBackgroundDownlinkBytes << ","
+                       << FormatThesisMetric (g_idealMecUplinkCapacityMbps) << ","
+                       << FormatThesisMetric (g_idealMecDownlinkCapacityMbps) << ","
+                       << mecUlBytesDelta << "," << mecDlBytesDelta << ","
+                       << FormatThesisMetric (mecUlOfferedMbps) << ","
+                       << FormatThesisMetric (mecDlOfferedMbps) << ","
+                       << FormatThesisMetric (mecUlBusyRatio) << ","
+                       << FormatThesisMetric (mecDlBusyRatio) << ","
+                       << g_mecForwardDrops << ","
                        << g_mecForwardNoReceiver << ","
+                       << FormatThesisMetric (v2vAoiMeanMs) << ","
+                       << FormatThesisMetric (v2vAoiP50Ms) << ","
+                       << FormatThesisMetric (v2vAoiP90Ms) << ","
+                       << FormatThesisMetric (v2vAoiP99Ms) << ","
+                       << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[0],
+                                                           g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[1],
+                                                           g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[2],
+                                                           g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[3],
+                                                           g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[0],
+                                                               g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[1],
+                                                               g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[2],
+                                                               g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[3],
+                                                               g_v2vAoiSamples)) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vAoiRecognitionRatioSum[0],
+                              g_thesisStats.v2vAoiRecognitionVehicleSamples[0])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vAoiRecognitionRatioSum[1],
+                              g_thesisStats.v2vAoiRecognitionVehicleSamples[1])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vAoiRecognitionRatioSum[2],
+                              g_thesisStats.v2vAoiRecognitionVehicleSamples[2])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vAoiRecognitionRatioSum[3],
+                              g_thesisStats.v2vAoiRecognitionVehicleSamples[3])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vOnlyAoiRecognitionRatioSum[0],
+                              g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[0])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vOnlyAoiRecognitionRatioSum[1],
+                              g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[1])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vOnlyAoiRecognitionRatioSum[2],
+                              g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[2])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.v2vOnlyAoiRecognitionRatioSum[3],
+                              g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[3])) << ","
                        << FormatThesisMetric (mecAoiMeanMs) << ","
                        << FormatThesisMetric (mecAoiP50Ms) << ","
                        << FormatThesisMetric (mecAoiP90Ms) << ","
@@ -3712,6 +4103,14 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                                                            g_idealMecAoiSamples)) << ","
                        << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[3],
                                                            g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[0],
+                                                               g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[1],
+                                                               g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[2],
+                                                               g_idealMecAoiSamples)) << ","
+                       << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[3],
+                                                               g_idealMecAoiSamples)) << ","
                        << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[0],
                                                            g_idealMecHighAoiSamples)) << ","
                        << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[1],
@@ -3728,6 +4127,30 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                                                            g_idealMecLowAoiSamples)) << ","
                        << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[3],
                                                            g_idealMecLowAoiSamples)) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecAoiRecognitionRatioSum[0],
+                              g_thesisStats.mecAoiRecognitionVehicleSamples[0])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecAoiRecognitionRatioSum[1],
+                              g_thesisStats.mecAoiRecognitionVehicleSamples[1])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecAoiRecognitionRatioSum[2],
+                              g_thesisStats.mecAoiRecognitionVehicleSamples[2])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecAoiRecognitionRatioSum[3],
+                              g_thesisStats.mecAoiRecognitionVehicleSamples[3])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecOnlyAoiRecognitionRatioSum[0],
+                              g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[0])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecOnlyAoiRecognitionRatioSum[1],
+                              g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[1])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecOnlyAoiRecognitionRatioSum[2],
+                              g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[2])) << ","
+                       << FormatThesisMetric (PercentFromRatioSum (
+                              g_thesisStats.mecOnlyAoiRecognitionRatioSum[3],
+                              g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[3])) << ","
                        << FormatThesisMetric (mecCapacityDelayMeanMs) << ","
                        << FormatThesisMetric (mecCapacityDelayP90Ms) << ","
                        << FormatThesisMetric (mecCapacityDelayP99Ms) << ","
@@ -3736,6 +4159,12 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << g_idealMecUlRetxRecovered << "," << g_idealMecDlRetxRecovered
                        << "," << g_idealMecUlFinalLosses << ","
                        << g_idealMecDlFinalLosses << ","
+                       << FormatThesisMetric (mecUpdateFailureRate) << ","
+                       << FormatThesisMetric (mecUpdateFailureRate) << ","
+                       << FormatThesisMetric (mecValidUpdateSuccessRate) << ","
+                       << FormatThesisMetric (mecUlFinalLossRate) << ","
+                       << FormatThesisMetric (mecDlFinalLossRate) << ","
+                       << FormatThesisMetric (mecRadioFinalLossRate) << ","
                        << FormatThesisMetric (mecRetxDelayMeanMs) << ","
                        << FormatThesisMetric (mecRetxDelayP90Ms) << ","
                        << FormatThesisMetric (orr) << ","
@@ -3743,6 +4172,10 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << FormatThesisMetric (lowPdr) << ","
                        << FormatThesisMetric (highLoss) << ","
                        << FormatThesisMetric (lowLoss) << ","
+                       << FormatThesisMetric (v2vRadioLoss) << ","
+                       << FormatThesisMetric (v2vHighRadioLoss) << ","
+                       << FormatThesisMetric (v2vLowRadioLoss) << ","
+                       << FormatThesisMetric (v2vUpdateFailureRate) << ","
                        << g_thesisStats.highIdealCpmRx << "," << g_thesisStats.highTrueCpmRx
                        << "," << g_thesisStats.lowIdealCpmRx << ","
                        << g_thesisStats.lowTrueCpmRx << ","
@@ -4575,6 +5008,17 @@ main (int argc, char* argv[])
   bool realtime = false;
   bool verbose = false;
   bool sumoGui = true;
+  std::string sumoScreenshotDir;
+  std::string sumoScreenshotView = "View #0";
+  double sumoScreenshotIntervalSeconds = 0.0;
+  double sumoScreenshotStartSeconds = 0.0;
+  double sumoScreenshotStopSeconds = 0.0;
+  double sumoScreenshotCenterX = 1500.0;
+  double sumoScreenshotCenterY = 38.0;
+  double sumoScreenshotSpanX = 900.0;
+  double sumoScreenshotSpanY = 180.0;
+  int sumoScreenshotWidth = 1600;
+  int sumoScreenshotHeight = 900;
   bool sendCpm = true;
   bool enableDcc = false;
   bool enableRouteControl = true;
@@ -4703,6 +5147,12 @@ main (int argc, char* argv[])
   double mecIdealRetxSuccessProbability = 0.53;
   uint32_t mecIdealMaxRetransmissions = 4;
   double mecIdealRetxDelayMs = 3.0;
+  bool mecIdealAoiFilter = false;
+  double mecIdealAoiFilterThresholdMs = 200.0;
+  bool mecBackgroundLoad = false;
+  bool mecBackgroundPerVehicle = true;
+  uint32_t mecBackgroundPacketSizeBytes = 500;
+  double mecBackgroundIntervalMs = 100.0;
   uint32_t maxCommunicationVehicles = 0;
 
   double centralFrequencyBandSl = 5.89e9;
@@ -4741,6 +5191,21 @@ main (int argc, char* argv[])
   cmd.AddValue ("realtime", "Run with the realtime scheduler", realtime);
   cmd.AddValue ("verbose", "Enable verbose legacy V2V logging", verbose);
   cmd.AddValue ("sumo-gui", "Show SUMO GUI", sumoGui);
+  cmd.AddValue ("sumo-screenshot-dir",
+                "Directory for periodic SUMO GUI screenshots; empty disables screenshots",
+                sumoScreenshotDir);
+  cmd.AddValue ("sumo-screenshot-view", "SUMO GUI view id for screenshots", sumoScreenshotView);
+  cmd.AddValue ("sumo-screenshot-interval",
+                "SUMO GUI screenshot interval [s]; <=0 disables screenshots",
+                sumoScreenshotIntervalSeconds);
+  cmd.AddValue ("sumo-screenshot-start", "First SUMO GUI screenshot time [s]", sumoScreenshotStartSeconds);
+  cmd.AddValue ("sumo-screenshot-stop", "Last SUMO GUI screenshot time [s]; <=0 uses sim-time", sumoScreenshotStopSeconds);
+  cmd.AddValue ("sumo-screenshot-center-x", "SUMO GUI screenshot boundary center x [m]", sumoScreenshotCenterX);
+  cmd.AddValue ("sumo-screenshot-center-y", "SUMO GUI screenshot boundary center y [m]", sumoScreenshotCenterY);
+  cmd.AddValue ("sumo-screenshot-span-x", "SUMO GUI screenshot boundary width [m]", sumoScreenshotSpanX);
+  cmd.AddValue ("sumo-screenshot-span-y", "SUMO GUI screenshot boundary height [m]", sumoScreenshotSpanY);
+  cmd.AddValue ("sumo-screenshot-width", "SUMO GUI screenshot pixel width", sumoScreenshotWidth);
+  cmd.AddValue ("sumo-screenshot-height", "SUMO GUI screenshot pixel height", sumoScreenshotHeight);
   cmd.AddValue ("send-cpm", "Enable CPM dissemination in addition to CAM", sendCpm);
   cmd.AddValue ("cpm-start-delay",
                 "Delay CPM dissemination start after route activation [s]",
@@ -4788,7 +5253,7 @@ main (int argc, char* argv[])
                 "Width [m] of the moving high-load background region",
                 nrBgWaveWidthMeters);
   cmd.AddValue ("method",
-                "Run method: legacy, no-control, reactive-rmr, predictive-rmr-v2v, predictive-rmr-v2n2v, cbr-route-nr-sidelink",
+                "Run method: legacy, no-control, reactive-rmr, predictive-rmr-v2v, predictive-rmr-v2n2v, hybrid-v2v-v2n2v, v2n2v-only, cbr-route-nr-sidelink",
                 method);
   cmd.AddValue ("reactive-rmr", "Enable thesis-style CBR-reactive CPM object deletion", enableReactiveRmr);
   cmd.AddValue ("predictive-rmr", "Use predicted CBR instead of measured CBR as the RMR input", enablePredictiveRmr);
@@ -4992,6 +5457,24 @@ main (int argc, char* argv[])
   cmd.AddValue ("mec-ideal-retx-delay-ms",
                 "Additional delay [ms] per abstract retransmission attempt",
                 mecIdealRetxDelayMs);
+  cmd.AddValue ("mec-ideal-aoi-filter",
+                "If true, stale abstract MEC CPMs do not update ORR recognition state",
+                mecIdealAoiFilter);
+  cmd.AddValue ("mec-ideal-aoi-filter-threshold-ms",
+                "AoI threshold [ms] used by --mec-ideal-aoi-filter",
+                mecIdealAoiFilterThresholdMs);
+  cmd.AddValue ("mec-bg",
+                "Add abstract MEC UL/DL background traffic to the capacity model",
+                mecBackgroundLoad);
+  cmd.AddValue ("mec-bg-per-vehicle",
+                "If true, every active communication vehicle contributes MEC background load",
+                mecBackgroundPerVehicle);
+  cmd.AddValue ("mec-bg-size",
+                "Abstract MEC background packet size [bytes]",
+                mecBackgroundPacketSizeBytes);
+  cmd.AddValue ("mec-bg-interval-ms",
+                "Abstract MEC background packet interval [ms]",
+                mecBackgroundIntervalMs);
   cmd.AddValue ("max-communication-vehicles",
                 "Maximum number of SUMO vehicles that run CAM/CPM/V2X applications; 0 means all",
                 maxCommunicationVehicles);
@@ -5080,6 +5563,14 @@ main (int argc, char* argv[])
       enableMecV2n2v = true;
       enableMecRouteControl = false;
       enableMecOnly = true;
+    }
+  else if (method == "hybrid-v2v-v2n2v")
+    {
+      enableReactiveRmr = false;
+      enablePredictiveRmr = false;
+      enableRouteControl = false;
+      enableMecV2n2v = true;
+      enableMecRouteControl = true;
     }
   else if (method == "cbr-route-nr-sidelink")
     {
@@ -5176,6 +5667,18 @@ main (int argc, char* argv[])
   if (dsrcInterferencePacketSize == 0)
     {
       NS_FATAL_ERROR ("dsrc-interference-size must be greater than 0");
+    }
+  if (mecIdealAoiFilterThresholdMs <= 0.0)
+    {
+      NS_FATAL_ERROR ("mec-ideal-aoi-filter-threshold-ms must be greater than 0");
+    }
+  if (mecBackgroundPacketSizeBytes == 0)
+    {
+      NS_FATAL_ERROR ("mec-bg-size must be greater than 0");
+    }
+  if (mecBackgroundIntervalMs <= 0.0)
+    {
+      NS_FATAL_ERROR ("mec-bg-interval-ms must be greater than 0");
     }
   if (nrBgWavePeriodSeconds <= 0.0 || nrBgWaveSpeedMps <= 0.0 ||
       nrBgWaveMinFactor <= 0.0 || nrBgWaveAmplitude < 0.0 ||
@@ -5406,6 +5909,12 @@ main (int argc, char* argv[])
   g_idealMecRetxSuccessProbability = mecIdealRetxSuccessProbability;
   g_idealMecMaxRetransmissions = mecIdealMaxRetransmissions;
   g_idealMecRetxDelayMs = mecIdealRetxDelayMs;
+  g_idealMecAoiFilter = mecIdealAoiFilter;
+  g_idealMecAoiFilterThresholdMs = mecIdealAoiFilterThresholdMs;
+  g_mecBackgroundLoad = mecBackgroundLoad;
+  g_mecBackgroundPerVehicle = mecBackgroundPerVehicle;
+  g_mecBackgroundPacketSizeBytes = mecBackgroundPacketSizeBytes;
+  g_mecBackgroundInterval = MilliSeconds (mecBackgroundIntervalMs);
   g_maxCommunicationVehicles = maxCommunicationVehicles;
   g_priorityDistanceThresholdMeters = priorityDistanceMeters;
   g_priorityClosingSpeedThresholdMps = priorityClosingSpeedMps;
@@ -6327,7 +6836,13 @@ main (int argc, char* argv[])
     g_priorityMotionHistory.erase (stationId);
     g_latestCpmRxByReceiver.erase (stationId);
     g_latestNrCpmRxByReceiver.erase (stationId);
+    g_latestNrCpmGenerationTimeByReceiver.erase (stationId);
     g_latestMecCpmRxByReceiver.erase (stationId);
+    for (auto& updates : g_latestMecCpmRxByReceiverAoiThreshold)
+      {
+        updates.erase (stationId);
+      }
+    g_latestMecCpmGenerationTimeByReceiver.erase (stationId);
     g_latestActualCpmObjectRxByReceiver.erase (stationId);
     for (auto& entry : g_latestCpmRxByReceiver)
       {
@@ -6337,7 +6852,22 @@ main (int argc, char* argv[])
       {
         entry.second.erase (stationId);
       }
+    for (auto& entry : g_latestNrCpmGenerationTimeByReceiver)
+      {
+        entry.second.erase (stationId);
+      }
     for (auto& entry : g_latestMecCpmRxByReceiver)
+      {
+        entry.second.erase (stationId);
+      }
+    for (auto& updates : g_latestMecCpmRxByReceiverAoiThreshold)
+      {
+        for (auto& entry : updates)
+          {
+            entry.second.erase (stationId);
+          }
+      }
+    for (auto& entry : g_latestMecCpmGenerationTimeByReceiver)
       {
         entry.second.erase (stationId);
       }
@@ -6374,6 +6904,25 @@ main (int argc, char* argv[])
   std::cout << "Setup progress: SUMO setup begin" << std::endl;
   sumoClient->SumoSetup (setupNewVehicle, shutdownVehicle);
   std::cout << "Setup progress: SUMO setup complete" << std::endl;
+  if (sumoGui && !sumoScreenshotDir.empty () && sumoScreenshotIntervalSeconds > 0.0)
+    {
+      SumoScreenshotConfig screenshotConfig;
+      screenshotConfig.dir = sumoScreenshotDir;
+      screenshotConfig.viewId = sumoScreenshotView;
+      screenshotConfig.centerX = sumoScreenshotCenterX;
+      screenshotConfig.centerY = sumoScreenshotCenterY;
+      screenshotConfig.spanX = sumoScreenshotSpanX;
+      screenshotConfig.spanY = sumoScreenshotSpanY;
+      screenshotConfig.width = sumoScreenshotWidth;
+      screenshotConfig.height = sumoScreenshotHeight;
+      screenshotConfig.intervalSeconds = sumoScreenshotIntervalSeconds;
+      screenshotConfig.stopSeconds =
+          sumoScreenshotStopSeconds > 0.0 ? sumoScreenshotStopSeconds : simTime;
+      Simulator::Schedule (Seconds (std::max (0.0, sumoScreenshotStartSeconds)),
+                           &CaptureSumoGuiScreenshot,
+                           sumoClient,
+                           screenshotConfig);
+    }
   if (g_holdTrafficUntilEvaluationStart)
     {
       Simulator::Schedule (MilliSeconds (100), &HoldTrafficUntilEvaluationStart);
@@ -6381,6 +6930,10 @@ main (int argc, char* argv[])
   if (enableMecV2n2v && g_useIdealMecLink)
     {
       Simulator::Schedule (g_idealMecInterval, &GenerateIdealMecCpm);
+      if (g_mecBackgroundLoad)
+        {
+          Simulator::Schedule (g_mecBackgroundInterval, &GenerateIdealMecBackgroundLoad);
+        }
     }
   if (enableRouteControl)
     {
@@ -6397,18 +6950,18 @@ main (int argc, char* argv[])
                            &UpdatePredictiveRmrCbr,
                            channelMetrics,
                            Seconds (routeCheckInterval));
-      if (enableMecRouteControl)
-        {
-          Simulator::Schedule (Seconds (routeCheckInterval) + MicroSeconds (1),
-                               &CheckHybridRoutesByPredictedCbrToMec,
-                               channelMetrics,
-                               Seconds (routeCheckInterval));
-        }
     }
   else if (enableReactiveRmr)
     {
       Simulator::Schedule (Seconds (routeCheckInterval),
                            &UpdateReactiveRmrCbr,
+                           channelMetrics,
+                           Seconds (routeCheckInterval));
+    }
+  if (enableMecRouteControl)
+    {
+      Simulator::Schedule (Seconds (routeCheckInterval) + MicroSeconds (1),
+                           &CheckHybridRoutesByPredictedCbrToMec,
                            channelMetrics,
                            Seconds (routeCheckInterval));
     }
@@ -6481,9 +7034,25 @@ main (int argc, char* argv[])
   const double nrRouteLoss =
       ThesisPacketLossRatePercent (g_thesisStats.nrUpdateExpected,
                                    g_thesisStats.nrUpdateSuccess);
+  const double v2vRadioLoss =
+      ThesisPacketLossRatePercent (g_thesisStats.nrIdealCpmRx, g_thesisStats.nrTrueCpmRx);
+  const double v2vHighRadioLoss =
+      ThesisPacketLossRatePercent (g_thesisStats.nrHighIdealCpmRx,
+                                   g_thesisStats.nrHighTrueCpmRx);
+  const double v2vLowRadioLoss =
+      ThesisPacketLossRatePercent (g_thesisStats.nrLowIdealCpmRx, g_thesisStats.nrLowTrueCpmRx);
   const double mecRouteLoss =
       ThesisPacketLossRatePercent (g_thesisStats.mecUpdateExpected,
                                    g_thesisStats.mecUpdateSuccess);
+  const double mecValidUpdateSuccessRate =
+      PercentRate (g_thesisStats.mecUpdateSuccess, g_thesisStats.mecUpdateExpected);
+  const double mecUlFinalLossRate =
+      PercentRate (g_idealMecUlFinalLosses, g_mecUplinkPackets);
+  const double mecDlFinalLossRate =
+      PercentRate (g_idealMecDlFinalLosses, g_mecForwardedPackets);
+  const double mecRadioFinalLossRate =
+      PercentRate (g_idealMecUlFinalLosses + g_idealMecDlFinalLosses,
+                   g_mecUplinkPackets + g_mecForwardedPackets);
   const double ttlViolationRate =
       PercentFromRatioSum (g_thesisStats.ttlViolationRatioSum,
                            g_thesisStats.ttlViolationVehicleSamples);
@@ -6552,6 +7121,10 @@ main (int argc, char* argv[])
   const double mecLatencyP99 =
       g_useIdealMecLink ? Percentile (g_idealMecLatencySamplesMs, 99.0)
                         : mecMetrics->getLatencyPercentile_messagetype (cpmType, 99.0);
+  const double v2vAoiMeanMs = Mean (g_v2vAoiSamplesMs);
+  const double v2vAoiP50Ms = Percentile (g_v2vAoiSamplesMs, 50.0);
+  const double v2vAoiP90Ms = Percentile (g_v2vAoiSamplesMs, 90.0);
+  const double v2vAoiP99Ms = Percentile (g_v2vAoiSamplesMs, 99.0);
   const double mecAoiMeanMs = Mean (g_idealMecAoiSamplesMs);
   const double mecAoiP50Ms = Percentile (g_idealMecAoiSamplesMs, 50.0);
   const double mecAoiP90Ms = Percentile (g_idealMecAoiSamplesMs, 90.0);
@@ -6561,6 +7134,14 @@ main (int argc, char* argv[])
   const double mecCapacityDelayP99Ms = Percentile (g_idealMecCapacityDelaySamplesMs, 99.0);
   const double mecRetxDelayMeanMs = Mean (g_idealMecRetxDelaySamplesMs);
   const double mecRetxDelayP90Ms = Percentile (g_idealMecRetxDelaySamplesMs, 90.0);
+  const double mecUlBusyRatioMean = Mean (g_mecUlBusyRatioSamples);
+  const double mecUlBusyRatioP90 = Percentile (g_mecUlBusyRatioSamples, 90.0);
+  const double mecUlBusyRatioP99 = Percentile (g_mecUlBusyRatioSamples, 99.0);
+  const double mecUlBusyRatioMax = Percentile (g_mecUlBusyRatioSamples, 100.0);
+  const double mecDlBusyRatioMean = Mean (g_mecDlBusyRatioSamples);
+  const double mecDlBusyRatioP90 = Percentile (g_mecDlBusyRatioSamples, 90.0);
+  const double mecDlBusyRatioP99 = Percentile (g_mecDlBusyRatioSamples, 99.0);
+  const double mecDlBusyRatioMax = Percentile (g_mecDlBusyRatioSamples, 100.0);
   const double effectiveChannelBusyRatio =
       static_cast<double> (channelMetrics->getAverageCBROverall ());
   std::cout << "Thesis 4.3 recognition rate (%): "
@@ -6600,6 +7181,13 @@ main (int argc, char* argv[])
             << ", NR-V2X sidelink V2V=" << FormatThesisMetric (nrRouteLoss)
             << ", MEC V2N2V=" << FormatThesisMetric (mecRouteLoss)
             << std::endl;
+  std::cout << "MEC V2N2V valid-update/radio final loss (%): fresh-update-loss="
+            << FormatThesisMetric (mecRouteLoss)
+            << ", valid-update-success=" << FormatThesisMetric (mecValidUpdateSuccessRate)
+            << ", UL-final=" << FormatThesisMetric (mecUlFinalLossRate)
+            << ", DL-final=" << FormatThesisMetric (mecDlFinalLossRate)
+            << ", combined-final=" << FormatThesisMetric (mecRadioFinalLossRate)
+            << std::endl;
   std::cout << "Legacy V2V average CBR: " << dsrcMetrics->getAverageCBROverall () << std::endl;
   std::cout << "Legacy V2V average PRR: " << dsrcMetrics->getAveragePRR_overall () << std::endl;
   std::cout << "Legacy V2V average packet loss: "
@@ -6623,6 +7211,22 @@ main (int argc, char* argv[])
   std::cout << "NR-V2X sidelink V2V CPM latency percentiles (ms): p50="
             << nrLatencyP50 << ", p90=" << nrLatencyP90 << ", p95=" << nrLatencyP95
             << ", p99=" << nrLatencyP99 << std::endl;
+  std::cout << "NR-V2X sidelink V2V AoI from TX timestamp (ms): mean="
+            << v2vAoiMeanMs << ", p50=" << v2vAoiP50Ms << ", p90=" << v2vAoiP90Ms
+            << ", p99=" << v2vAoiP99Ms << std::endl;
+  std::cout << "NR-V2X sidelink V2V AoI <=200/300/400/500 ms (%): "
+            << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[0],
+                                                g_v2vAoiSamples))
+            << "/"
+            << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[1],
+                                                g_v2vAoiSamples))
+            << "/"
+            << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[2],
+                                                g_v2vAoiSamples))
+            << "/"
+            << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[3],
+                                                g_v2vAoiSamples))
+            << std::endl;
   std::cout << "MEC V2N2V packet delivery (%): "
             << FormatThesisMetric (
                    ThesisPacketDeliveryRatioPercent (g_thesisStats.mecIdealCpmRx,
@@ -6639,13 +7243,13 @@ main (int argc, char* argv[])
   std::cout << "MEC V2N2V AoI from CPM generation (ms): mean="
             << mecAoiMeanMs << ", p50=" << mecAoiP50Ms << ", p90=" << mecAoiP90Ms
             << ", p99=" << mecAoiP99Ms << std::endl;
-  std::cout << "MEC V2N2V AoI threshold success (%): <=50="
+  std::cout << "MEC V2N2V AoI threshold success (%): <=200="
             << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[0],
                                                 g_idealMecAoiSamples))
-            << ", <=100="
+            << ", <=300="
             << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[1],
                                                 g_idealMecAoiSamples))
-            << ", <=200="
+            << ", <=400="
             << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[2],
                                                 g_idealMecAoiSamples))
             << ", <=500="
@@ -6693,10 +7297,16 @@ main (int argc, char* argv[])
           << "orr,high_pdr,low_pdr,high_packet_loss,low_packet_loss,"
           << "high_ideal_rx,high_true_rx,low_ideal_rx,low_true_rx,"
           << "legacy_route_loss,nr_route_loss,mec_route_loss,channel_busy_ratio,legacy_tx,legacy_rx,"
+          << "v2v_radio_loss_rate,v2v_high_radio_loss_rate,v2v_low_radio_loss_rate,"
+          << "v2v_update_failure_rate,"
+          << "mec_fresh_update_loss_rate,mec_update_failure_rate,mec_valid_update_success_rate,"
+          << "mec_ul_final_loss_rate,mec_dl_final_loss_rate,mec_radio_final_loss_rate,"
           << "nr_latency_ms,nr_latency_p50_ms,nr_latency_p90_ms,nr_latency_p95_ms,nr_latency_p99_ms,"
           << "mec_tx,mec_rx,mec_latency_ms,mec_latency_p50_ms,mec_latency_p90_ms,"
           << "mec_latency_p95_ms,mec_latency_p99_ms,interference_tx,interference_drops,"
-          << "interference_bytes,ttl_violation_rate,never_received_rate,"
+          << "interference_bytes,mec_bg_ul_bytes,mec_bg_dl_bytes,"
+          << "mec_aoi_filter,mec_aoi_filter_threshold_ms,"
+          << "ttl_violation_rate,never_received_rate,"
           << "high_ttl_violation_rate,high_never_received_rate,"
           << "low_ttl_violation_rate,low_never_received_rate,"
           << "sensor_external_event_candidate_vehicles,sensor_external_event_selected_vehicles,"
@@ -6704,15 +7314,35 @@ main (int argc, char* argv[])
           << "sensor_external_event_missed,sensor_external_event_censored,"
           << "sensor_external_event_recognition_rate,"
           << "sensor_external_event_delay_mean_ms,sensor_external_event_delay_p50_ms,"
+          << "v2v_aoi_mean_ms,v2v_aoi_p50_ms,v2v_aoi_p90_ms,v2v_aoi_p99_ms,"
+          << "v2v_aoi_le_200_ms_rate,v2v_aoi_le_300_ms_rate,"
+          << "v2v_aoi_le_400_ms_rate,v2v_aoi_le_500_ms_rate,"
+          << "v2v_aoi_violation_rate_200ms,v2v_aoi_violation_rate_300ms,"
+          << "v2v_aoi_violation_rate_400ms,v2v_aoi_violation_rate_500ms,"
+          << "v2v_aoi_orr_le_200_ms,v2v_aoi_orr_le_300_ms,"
+          << "v2v_aoi_orr_le_400_ms,v2v_aoi_orr_le_500_ms,"
+          << "v2v_only_aoi_orr_le_200_ms,v2v_only_aoi_orr_le_300_ms,"
+          << "v2v_only_aoi_orr_le_400_ms,v2v_only_aoi_orr_le_500_ms,"
           << "mec_aoi_mean_ms,mec_aoi_p50_ms,mec_aoi_p90_ms,mec_aoi_p99_ms,"
-          << "mec_aoi_le_50_ms_rate,mec_aoi_le_100_ms_rate,"
-          << "mec_aoi_le_200_ms_rate,mec_aoi_le_500_ms_rate,"
-          << "mec_high_aoi_le_50_ms_rate,mec_high_aoi_le_100_ms_rate,"
-          << "mec_high_aoi_le_200_ms_rate,mec_high_aoi_le_500_ms_rate,"
-          << "mec_low_aoi_le_50_ms_rate,mec_low_aoi_le_100_ms_rate,"
-          << "mec_low_aoi_le_200_ms_rate,mec_low_aoi_le_500_ms_rate,"
+          << "mec_aoi_le_200_ms_rate,mec_aoi_le_300_ms_rate,"
+          << "mec_aoi_le_400_ms_rate,mec_aoi_le_500_ms_rate,"
+          << "mec_aoi_violation_rate_200ms,mec_aoi_violation_rate_300ms,"
+          << "mec_aoi_violation_rate_400ms,mec_aoi_violation_rate_500ms,"
+          << "mec_high_aoi_le_200_ms_rate,mec_high_aoi_le_300_ms_rate,"
+          << "mec_high_aoi_le_400_ms_rate,mec_high_aoi_le_500_ms_rate,"
+          << "mec_low_aoi_le_200_ms_rate,mec_low_aoi_le_300_ms_rate,"
+          << "mec_low_aoi_le_400_ms_rate,mec_low_aoi_le_500_ms_rate,"
+          << "mec_aoi_orr_le_200_ms,mec_aoi_orr_le_300_ms,"
+          << "mec_aoi_orr_le_400_ms,mec_aoi_orr_le_500_ms,"
+          << "mec_only_aoi_orr_le_200_ms,mec_only_aoi_orr_le_300_ms,"
+          << "mec_only_aoi_orr_le_400_ms,mec_only_aoi_orr_le_500_ms,"
           << "mec_capacity_delay_mean_ms,mec_capacity_delay_p90_ms,"
           << "mec_capacity_delay_p99_ms,mec_capacity_queue_drops,"
+          << "mec_ul_capacity_mbps,mec_dl_capacity_mbps,"
+          << "mec_ul_busy_ratio_mean,mec_ul_busy_ratio_p90,"
+          << "mec_ul_busy_ratio_p99,mec_ul_busy_ratio_max,"
+          << "mec_dl_busy_ratio_mean,mec_dl_busy_ratio_p90,"
+          << "mec_dl_busy_ratio_p99,mec_dl_busy_ratio_max,"
           << "mec_ul_first_losses,mec_dl_first_losses,"
           << "mec_ul_retx_recovered,mec_dl_retx_recovered,"
           << "mec_ul_final_losses,mec_dl_final_losses,"
@@ -6739,6 +7369,16 @@ main (int argc, char* argv[])
                  << "," << effectiveChannelBusyRatio << ","
                  << dsrcMetrics->getNumberTx_overall () << ","
                  << dsrcMetrics->getNumberRx_overall () << ","
+                 << FormatThesisMetric (v2vRadioLoss) << ","
+                 << FormatThesisMetric (v2vHighRadioLoss) << ","
+                 << FormatThesisMetric (v2vLowRadioLoss) << ","
+                 << FormatThesisMetric (nrRouteLoss) << ","
+                 << FormatThesisMetric (mecRouteLoss) << ","
+                 << FormatThesisMetric (mecRouteLoss) << ","
+                 << FormatThesisMetric (mecValidUpdateSuccessRate) << ","
+                 << FormatThesisMetric (mecUlFinalLossRate) << ","
+                 << FormatThesisMetric (mecDlFinalLossRate) << ","
+                 << FormatThesisMetric (mecRadioFinalLossRate) << ","
                  << nrMetrics->getAverageLatency_overall () << ","
                  << nrLatencyP50 << "," << nrLatencyP90 << "," << nrLatencyP95 << ","
                  << nrLatencyP99 << ","
@@ -6748,6 +7388,9 @@ main (int argc, char* argv[])
                  << mecLatencyP50 << "," << mecLatencyP90 << "," << mecLatencyP95 << ","
                  << mecLatencyP99 << "," << g_interferenceTx << ","
                  << g_interferenceDrops << "," << g_interferenceBytes << ","
+                 << g_mecBackgroundUplinkBytes << "," << g_mecBackgroundDownlinkBytes << ","
+                 << (g_idealMecAoiFilter ? 1 : 0) << ","
+                 << FormatThesisMetric (g_idealMecAoiFilterThresholdMs) << ","
                  << FormatThesisMetric (ttlViolationRate) << ","
                  << FormatThesisMetric (neverReceivedRate) << ","
                  << FormatThesisMetric (highTtlViolationRate) << ","
@@ -6763,6 +7406,50 @@ main (int argc, char* argv[])
                  << FormatThesisMetric (sensorExternalEventRecognitionRate) << ","
                  << FormatThesisMetric (sensorExternalEventDelayMeanMs) << ","
                  << FormatThesisMetric (sensorExternalEventDelayP50Ms) << ","
+                 << FormatThesisMetric (v2vAoiMeanMs) << ","
+                 << FormatThesisMetric (v2vAoiP50Ms) << ","
+                 << FormatThesisMetric (v2vAoiP90Ms) << ","
+                 << FormatThesisMetric (v2vAoiP99Ms) << ","
+                 << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[0],
+                                                     g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[1],
+                                                     g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[2],
+                                                     g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentRate (g_v2vAoiWithinThreshold[3],
+                                                     g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[0],
+                                                         g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[1],
+                                                         g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[2],
+                                                         g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_v2vAoiWithinThreshold[3],
+                                                         g_v2vAoiSamples)) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vAoiRecognitionRatioSum[0],
+                        g_thesisStats.v2vAoiRecognitionVehicleSamples[0])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vAoiRecognitionRatioSum[1],
+                        g_thesisStats.v2vAoiRecognitionVehicleSamples[1])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vAoiRecognitionRatioSum[2],
+                        g_thesisStats.v2vAoiRecognitionVehicleSamples[2])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vAoiRecognitionRatioSum[3],
+                        g_thesisStats.v2vAoiRecognitionVehicleSamples[3])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vOnlyAoiRecognitionRatioSum[0],
+                        g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[0])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vOnlyAoiRecognitionRatioSum[1],
+                        g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[1])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vOnlyAoiRecognitionRatioSum[2],
+                        g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[2])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.v2vOnlyAoiRecognitionRatioSum[3],
+                        g_thesisStats.v2vOnlyAoiRecognitionVehicleSamples[3])) << ","
                  << FormatThesisMetric (mecAoiMeanMs) << ","
                  << FormatThesisMetric (mecAoiP50Ms) << ","
                  << FormatThesisMetric (mecAoiP90Ms) << ","
@@ -6775,6 +7462,14 @@ main (int argc, char* argv[])
                                                      g_idealMecAoiSamples)) << ","
                  << FormatThesisMetric (PercentRate (g_idealMecAoiWithinThreshold[3],
                                                      g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[0],
+                                                         g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[1],
+                                                         g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[2],
+                                                         g_idealMecAoiSamples)) << ","
+                 << FormatThesisMetric (PercentMissRate (g_idealMecAoiWithinThreshold[3],
+                                                         g_idealMecAoiSamples)) << ","
                  << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[0],
                                                      g_idealMecHighAoiSamples)) << ","
                  << FormatThesisMetric (PercentRate (g_idealMecHighAoiWithinThreshold[1],
@@ -6791,10 +7486,44 @@ main (int argc, char* argv[])
                                                      g_idealMecLowAoiSamples)) << ","
                  << FormatThesisMetric (PercentRate (g_idealMecLowAoiWithinThreshold[3],
                                                      g_idealMecLowAoiSamples)) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecAoiRecognitionRatioSum[0],
+                        g_thesisStats.mecAoiRecognitionVehicleSamples[0])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecAoiRecognitionRatioSum[1],
+                        g_thesisStats.mecAoiRecognitionVehicleSamples[1])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecAoiRecognitionRatioSum[2],
+                        g_thesisStats.mecAoiRecognitionVehicleSamples[2])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecAoiRecognitionRatioSum[3],
+                        g_thesisStats.mecAoiRecognitionVehicleSamples[3])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecOnlyAoiRecognitionRatioSum[0],
+                        g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[0])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecOnlyAoiRecognitionRatioSum[1],
+                        g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[1])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecOnlyAoiRecognitionRatioSum[2],
+                        g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[2])) << ","
+                 << FormatThesisMetric (PercentFromRatioSum (
+                        g_thesisStats.mecOnlyAoiRecognitionRatioSum[3],
+                        g_thesisStats.mecOnlyAoiRecognitionVehicleSamples[3])) << ","
                  << FormatThesisMetric (mecCapacityDelayMeanMs) << ","
                  << FormatThesisMetric (mecCapacityDelayP90Ms) << ","
                  << FormatThesisMetric (mecCapacityDelayP99Ms) << ","
                  << g_idealMecCapacityQueueDrops << ","
+                 << FormatThesisMetric (g_idealMecUplinkCapacityMbps) << ","
+                 << FormatThesisMetric (g_idealMecDownlinkCapacityMbps) << ","
+                 << FormatThesisMetric (mecUlBusyRatioMean) << ","
+                 << FormatThesisMetric (mecUlBusyRatioP90) << ","
+                 << FormatThesisMetric (mecUlBusyRatioP99) << ","
+                 << FormatThesisMetric (mecUlBusyRatioMax) << ","
+                 << FormatThesisMetric (mecDlBusyRatioMean) << ","
+                 << FormatThesisMetric (mecDlBusyRatioP90) << ","
+                 << FormatThesisMetric (mecDlBusyRatioP99) << ","
+                 << FormatThesisMetric (mecDlBusyRatioMax) << ","
                  << g_idealMecUlFirstLosses << "," << g_idealMecDlFirstLosses << ","
                  << g_idealMecUlRetxRecovered << "," << g_idealMecDlRetxRecovered << ","
                  << g_idealMecUlFinalLosses << "," << g_idealMecDlFinalLosses << ","
