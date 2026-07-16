@@ -1,6 +1,6 @@
 # RMR + Hybrid BG500 Run Specification
 
-Date: 2026-07-16
+Date: 2026-07-16 17:58 JST
 
 Purpose:
 
