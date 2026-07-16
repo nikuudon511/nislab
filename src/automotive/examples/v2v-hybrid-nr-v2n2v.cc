@@ -326,6 +326,7 @@ static TrafficFlowPredictionState g_trafficFlowPrediction;
 static PredictiveRmrConfig g_predictiveRmrConfig;
 static HybridRouteConfig g_hybridRouteConfig;
 static std::vector<TrafficFlowRsuInfo> g_trafficFlowRsus;
+static bool g_enablePredictiveRmrControl = false;
 static std::string g_fixedRsuCbrMode = "disabled";
 static const std::array<double, 6> g_fixedRsuCbrValues = {{0.4, 0.8, 0.4, 0.9, 0.6, 0.4}};
 static std::unordered_map<std::string, TrafficFlowRsuPrediction>
@@ -4388,16 +4389,19 @@ UpdatePredictiveRmrCbr (Ptr<MetricSupervisor> channelMetrics, Time interval)
       state.lastDsrcCpmTx = cpmTx;
       state.initialized = true;
 
-      const double actionProbability = ComputePredictiveRmrActionProbability (predictedCbr);
-      SetRmrActionProbability (entry.second, actionProbability);
-      entry.second.dsrcContainer->getCPBasicService ()->setRmrCurrentCbr (predictedCbr);
-      if (entry.second.nrContainer != nullptr)
+      if (g_enablePredictiveRmrControl)
         {
-          entry.second.nrContainer->getCPBasicService ()->setRmrCurrentCbr (predictedCbr);
-        }
-      if (entry.second.mecContainer != nullptr)
-        {
-          entry.second.mecContainer->getCPBasicService ()->setRmrCurrentCbr (predictedCbr);
+          const double actionProbability = ComputePredictiveRmrActionProbability (predictedCbr);
+          SetRmrActionProbability (entry.second, actionProbability);
+          entry.second.dsrcContainer->getCPBasicService ()->setRmrCurrentCbr (predictedCbr);
+          if (entry.second.nrContainer != nullptr)
+            {
+              entry.second.nrContainer->getCPBasicService ()->setRmrCurrentCbr (predictedCbr);
+            }
+          if (entry.second.mecContainer != nullptr)
+            {
+              entry.second.mecContainer->getCPBasicService ()->setRmrCurrentCbr (predictedCbr);
+            }
         }
     }
   g_trafficFlowPrediction.i2vVehicleCount = i2vPredictionCount;
@@ -5030,6 +5034,7 @@ main (int argc, char* argv[])
   bool enableChannelRandomness = false;
   bool enableReactiveRmr = false;
   bool enablePredictiveRmr = false;
+  bool enableTrafficFlowRsuPredictor = false;
   bool enableMecV2n2v = false;
   bool enableMecRouteControl = false;
   bool enableMecOnly = false;
@@ -5257,6 +5262,9 @@ main (int argc, char* argv[])
                 method);
   cmd.AddValue ("reactive-rmr", "Enable thesis-style CBR-reactive CPM object deletion", enableReactiveRmr);
   cmd.AddValue ("predictive-rmr", "Use predicted CBR instead of measured CBR as the RMR input", enablePredictiveRmr);
+  cmd.AddValue ("traffic-flow-rsu-predictor",
+                "Enable traffic-flow RSU CBR prediction for hybrid route control without enabling RMR",
+                enableTrafficFlowRsuPredictor);
   cmd.AddValue ("rmr-cbr-low", "CBR threshold for low/middle RMR deletion phases", rmrCbrLow);
   cmd.AddValue ("rmr-cbr-high", "CBR threshold for middle/high RMR deletion phases", rmrCbrHigh);
   cmd.AddValue ("rmr-delete-low", "Objects deleted per CPM in low CBR phase", rmrDeleteLow);
@@ -5583,7 +5591,9 @@ main (int argc, char* argv[])
   if (enablePredictiveRmr)
     {
       enableReactiveRmr = true;
+      enableTrafficFlowRsuPredictor = true;
     }
+  g_enablePredictiveRmrControl = enablePredictiveRmr;
 
   if (releaseCbr > switchCbr)
     {
@@ -6097,7 +6107,8 @@ main (int argc, char* argv[])
     }
   std::cout << std::endl;
   std::cout << "Traffic-flow RSU sharing predictor: "
-            << (enablePredictiveRmr && !g_trafficFlowRsus.empty () ? "enabled" : "disabled")
+            << (enableTrafficFlowRsuPredictor && !g_trafficFlowRsus.empty () ? "enabled"
+                                                                             : "disabled")
             << ", rsus=" << g_trafficFlowRsus.size () << std::endl;
   std::cout << "CSV logs: CBR=" << cbrLogPath << ", route=" << routeLogPath
             << ", observation=" << observationLogPath << ", summary=" << summaryCsvPath
@@ -6943,7 +6954,7 @@ main (int argc, char* argv[])
                            releaseCbr,
                            Seconds (routeCheckInterval));
     }
-  if (enablePredictiveRmr)
+  if (enableTrafficFlowRsuPredictor)
     {
       Simulator::Schedule (Seconds (routeCheckInterval),
                            &UpdatePredictiveRmrCbr,
