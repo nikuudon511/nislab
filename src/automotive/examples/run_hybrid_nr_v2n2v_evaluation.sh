@@ -22,6 +22,10 @@ HYBRID_LOW_V2V_ALPHA=${HYBRID_LOW_V2V_ALPHA:-1}
 
 RMR_CBR_LOW=${RMR_CBR_LOW:-0.33}
 RMR_CBR_HIGH=${RMR_CBR_HIGH:-0.67}
+REACTIVE_RMR=${REACTIVE_RMR:-false}
+RMR_DELETE_LOW=${RMR_DELETE_LOW:-10}
+RMR_DELETE_MIDDLE=${RMR_DELETE_MIDDLE:-20}
+RMR_DELETE_HIGH=${RMR_DELETE_HIGH:-40}
 PREDICTION_HORIZON=${PREDICTION_HORIZON:-20}
 TRAFFIC_FLOW_ROAD_LENGTH=${TRAFFIC_FLOW_ROAD_LENGTH:-3000}
 TRAFFIC_FLOW_TOPOLOGY=${TRAFFIC_FLOW_TOPOLOGY:-straight}
@@ -199,6 +203,10 @@ for method in $METHODS; do
     --hybrid-low-v2v-alpha=$HYBRID_LOW_V2V_ALPHA \
     --rmr-cbr-low=$RMR_CBR_LOW \
     --rmr-cbr-high=$RMR_CBR_HIGH \
+    --reactive-rmr=$REACTIVE_RMR \
+    --rmr-delete-low=$RMR_DELETE_LOW \
+    --rmr-delete-middle=$RMR_DELETE_MIDDLE \
+    --rmr-delete-high=$RMR_DELETE_HIGH \
     --prediction-horizon=$PREDICTION_HORIZON \
     --traffic-flow-road-length=$TRAFFIC_FLOW_ROAD_LENGTH \
     --traffic-flow-topology=$TRAFFIC_FLOW_TOPOLOGY \

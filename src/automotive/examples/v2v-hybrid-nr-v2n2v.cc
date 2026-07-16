@@ -5566,7 +5566,6 @@ main (int argc, char* argv[])
     }
   else if (method == "hybrid-v2v-v2n2v")
     {
-      enableReactiveRmr = false;
       enablePredictiveRmr = false;
       enableRouteControl = false;
       enableMecV2n2v = true;
