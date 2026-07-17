@@ -1,6 +1,6 @@
 # RMR + Hybrid BG500 Run Specification
 
-Date: 2026-07-17 10:15 JST
+Date: 2026-07-17 10:35 JST
 
 Purpose:
 
@@ -83,26 +83,28 @@ Prediction should not be the immediate next main result:
 - Prediction may help only after the control policy avoids over-triggering dual transmission or after RMR reduces payload size.
 - If tested, use it after the RMR baseline is stable and compare `RMR + Hybrid` versus `Prediction + RMR + Hybrid`.
 
-## Receiver-Side Redundancy Logging Idea
+## Receiver-Side Redundancy Metrics
 
-A useful next research direction is to log redundancy at the receiver side.
+The simulator now logs receiver-side redundancy metrics in `observation.csv` and `summary.csv`.
 
 Goal:
 
 - Measure how many independent or recent observations each receiver actually has for the same object.
 - Determine whether RMR removes waste while preserving enough redundancy to tolerate packet loss.
 
-Candidate receiver-side metrics:
+Definition:
 
-- `object_observation_redundancy_mean`
-- `object_observation_redundancy_p50`
-- `object_observation_redundancy_p90`
-- `high_priority_redundancy_mean`
-- `low_priority_redundancy_mean`
-- `redundancy_ge_2_rate`
-- `redundancy_ge_3_rate`
-- `fresh_redundancy_ge_2_rate_200ms`
-- `fresh_redundancy_ge_2_rate_500ms`
+- For each receiver and expected object, count fresh independent observations from:
+  - sensor recognition
+  - NR sidelink CPM
+  - MEC/V2N2V CPM
+- `receiver_fresh_redundancy_200ms_mean`: mean fresh observation count under the 200 ms AoI threshold.
+- `receiver_fresh_redundancy_500ms_mean`: mean fresh observation count under the 500 ms AoI threshold.
+- `receiver_fresh_redundancy_ge2_200ms_rate`: percentage of receiver-object pairs with at least two fresh observations under 200 ms.
+- `receiver_fresh_redundancy_ge2_500ms_rate`: same under 500 ms.
+- `receiver_high_fresh_redundancy_200ms_mean`: 200 ms fresh redundancy mean for high-priority expected objects.
+- `receiver_low_fresh_redundancy_200ms_mean`: 200 ms fresh redundancy mean for low-priority expected objects.
+- `receiver_rv_200ms_score`: receiver-side RV-like score, defined as `min(fresh_redundancy_200ms / 2, 1)` averaged over receiver-object pairs.
 
 Interpretation target:
 
@@ -110,6 +112,39 @@ Interpretation target:
 - Redundancy of 1 means recognition depends on a single update and is fragile.
 - Redundancy of 2 or more suggests packet-loss tolerance through duplicated object knowledge.
 - Excessively high redundancy suggests waste and is a candidate for RMR deletion.
+
+RMR deletion diagnostics:
+
+- `rmr_deleted_eval_distance_mean_m`: mean receiver-object distance for expected objects deleted by RMR.
+- `rmr_deleted_eval_fresh_redundancy_ge2_200ms_rate`: among expected deleted objects, percentage that still had at least two fresh observations under 200 ms.
+- `rmr_deleted_eval_fresh_redundancy_ge2_500ms_rate`: same under 500 ms.
+- `rmr_deleted_eval_closing_speed_ge_threshold_rate`: percentage of expected deleted objects whose closing speed exceeded the high-priority threshold.
+- `rmr_deleted_eval_ttc_le_threshold_rate`: percentage of expected deleted objects whose TTC was within the high-priority threshold.
+- `rmr_deleted_sender_eval_total`: total deleted objects counted once from the sender side.
+- `rmr_deleted_sender_eval_high`: deleted objects that were high-priority from the sender side.
+- `rmr_deleted_sender_eval_low`: deleted objects that were low-priority from the sender side.
+- `rmr_deleted_sender_eval_distance_mean_m`: mean sender-object distance for deleted objects.
+- `rmr_deleted_sender_eval_closing_speed_ge_threshold_rate`: percentage of deleted objects whose sender-side closing speed exceeded the high-priority threshold.
+- `rmr_deleted_sender_eval_ttc_le_threshold_rate`: percentage of deleted objects whose sender-side TTC was within the high-priority threshold.
+
+Use the receiver-side `rmr_deleted_eval_*` fields to explain whether deleted objects were still redundant at receivers. Use the sender-side `rmr_deleted_sender_eval_*` fields to explain what kinds of objects RMR selected for deletion in the first place.
+
+RMR formula feature diagnostics in `observation.csv`:
+
+- `rmr_deleted_feature_count`: route-agnostic cumulative number of RMR-deleted objects whose selection features were logged up to this observation time.
+- `rmr_deleted_distance_mean_m`: route-agnostic mean RMR candidate distance for deleted objects.
+- `rmr_deleted_frequency_mean`: route-agnostic mean recent observation frequency `n` for deleted objects.
+- `rmr_deleted_position_change_mean_m`: route-agnostic mean position change `l` for deleted objects.
+- `rmr_deleted_speed_change_mean_mps`: route-agnostic mean speed change `v` for deleted objects.
+- `rmr_deleted_score_mean`: route-agnostic mean RMR score `n / (distance * min(l, v))` for deleted objects.
+- `nr_rmr_deleted_feature_count`: cumulative number of NR RMR-deleted objects whose selection features were logged up to this observation time.
+- `nr_rmr_deleted_distance_mean_m`: mean RMR candidate distance for deleted objects.
+- `nr_rmr_deleted_frequency_mean`: mean recent observation frequency `n` for deleted objects.
+- `nr_rmr_deleted_position_change_mean_m`: mean position change `l` for deleted objects.
+- `nr_rmr_deleted_speed_change_mean_mps`: mean speed change `v` for deleted objects.
+- `nr_rmr_deleted_score_mean`: mean RMR score `n / (distance * min(l, v))` for deleted objects.
+
+The route-agnostic `rmr_deleted_feature_*` fields are the primary diagnostics because RMR primary/offload sharing can make NR-side deleted counts differ from the container that computed the selection features. These fields do not depend on converting RMR object IDs back to active SUMO vehicle IDs.
 
 ## Important
 

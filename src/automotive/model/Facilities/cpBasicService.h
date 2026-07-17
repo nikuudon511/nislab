@@ -150,10 +150,22 @@ public:
   uint32_t getLastRmrCandidateCount() const {return m_last_rmr_candidate_count;}
   uint32_t getLastRmrIncludedObjectCount() const {return m_last_rmr_included_objects;}
   uint32_t getLastRmrDeletedObjectCount() const {return m_last_rmr_deleted_objects;}
+  uint32_t getLastRmrDeletedFeatureCount() const {return m_last_rmr_deleted_feature_count;}
+  double getLastRmrDeletedDistanceSum() const {return m_last_rmr_deleted_distance_sum;}
+  double getLastRmrDeletedFrequencySum() const {return m_last_rmr_deleted_frequency_sum;}
+  double getLastRmrDeletedPositionChangeSum() const {return m_last_rmr_deleted_position_change_sum;}
+  double getLastRmrDeletedSpeedChangeSum() const {return m_last_rmr_deleted_speed_change_sum;}
+  double getLastRmrDeletedScoreSum() const {return m_last_rmr_deleted_score_sum;}
   uint32_t getLastCpmSizeBytes() const {return m_last_cpm_size_bytes;}
   uint64_t getTotalRmrCandidateCount() const {return m_total_rmr_candidate_count;}
   uint64_t getTotalRmrIncludedObjectCount() const {return m_total_rmr_included_objects;}
   uint64_t getTotalRmrDeletedObjectCount() const {return m_total_rmr_deleted_objects;}
+  uint64_t getTotalRmrDeletedFeatureCount() const {return m_total_rmr_deleted_feature_count;}
+  double getTotalRmrDeletedDistanceSum() const {return m_total_rmr_deleted_distance_sum;}
+  double getTotalRmrDeletedFrequencySum() const {return m_total_rmr_deleted_frequency_sum;}
+  double getTotalRmrDeletedPositionChangeSum() const {return m_total_rmr_deleted_position_change_sum;}
+  double getTotalRmrDeletedSpeedChangeSum() const {return m_total_rmr_deleted_speed_change_sum;}
+  double getTotalRmrDeletedScoreSum() const {return m_total_rmr_deleted_score_sum;}
   uint64_t getTotalCpmSizeBytes() const {return m_total_cpm_size_bytes;}
   uint64_t getCpmSent() const {return m_cpm_sent;}
 
@@ -221,6 +233,12 @@ private:
   uint32_t m_last_rmr_candidate_count;
   uint32_t m_last_rmr_included_objects;
   uint32_t m_last_rmr_deleted_objects;
+  uint32_t m_last_rmr_deleted_feature_count;
+  double m_last_rmr_deleted_distance_sum;
+  double m_last_rmr_deleted_frequency_sum;
+  double m_last_rmr_deleted_position_change_sum;
+  double m_last_rmr_deleted_speed_change_sum;
+  double m_last_rmr_deleted_score_sum;
   std::set<uint64_t> m_last_rmr_deleted_ids;
   std::set<uint64_t> m_external_rmr_deleted_ids;
   bool m_use_external_rmr_deleted_ids;
@@ -228,6 +246,12 @@ private:
   uint64_t m_total_rmr_candidate_count;
   uint64_t m_total_rmr_included_objects;
   uint64_t m_total_rmr_deleted_objects;
+  uint64_t m_total_rmr_deleted_feature_count;
+  double m_total_rmr_deleted_distance_sum;
+  double m_total_rmr_deleted_frequency_sum;
+  double m_total_rmr_deleted_position_change_sum;
+  double m_total_rmr_deleted_speed_change_sum;
+  double m_total_rmr_deleted_score_sum;
   uint64_t m_total_cpm_size_bytes;
   VDP* m_vdp; //! VDP object
   Ptr<TraciClient> m_client;

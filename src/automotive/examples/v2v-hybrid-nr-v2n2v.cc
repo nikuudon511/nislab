@@ -148,6 +148,29 @@ struct ThesisEvaluationStats
   uint64_t rmrDeletedEvalUnrecognizedTotal = 0;
   uint64_t rmrDeletedEvalUnrecognizedHigh = 0;
   uint64_t rmrDeletedEvalUnrecognizedLow = 0;
+  double receiverFreshRedundancy200Sum = 0.0;
+  double receiverFreshRedundancy500Sum = 0.0;
+  double receiverFreshRedundancyHigh200Sum = 0.0;
+  double receiverFreshRedundancyLow200Sum = 0.0;
+  double receiverRv200Sum = 0.0;
+  uint64_t receiverFreshRedundancySamples = 0;
+  uint64_t receiverFreshRedundancyHighSamples = 0;
+  uint64_t receiverFreshRedundancyLowSamples = 0;
+  uint64_t receiverFreshRedundancyGe2_200 = 0;
+  uint64_t receiverFreshRedundancyGe2_500 = 0;
+  double rmrDeletedEvalDistanceSum = 0.0;
+  uint64_t rmrDeletedEvalDistanceSamples = 0;
+  uint64_t rmrDeletedEvalFreshRedundancyGe2_200 = 0;
+  uint64_t rmrDeletedEvalFreshRedundancyGe2_500 = 0;
+  uint64_t rmrDeletedEvalTtcLeThreshold = 0;
+  uint64_t rmrDeletedEvalClosingSpeedGeThreshold = 0;
+  uint64_t rmrDeletedSenderEvalTotal = 0;
+  uint64_t rmrDeletedSenderEvalHigh = 0;
+  uint64_t rmrDeletedSenderEvalLow = 0;
+  double rmrDeletedSenderEvalDistanceSum = 0.0;
+  uint64_t rmrDeletedSenderEvalDistanceSamples = 0;
+  uint64_t rmrDeletedSenderEvalTtcLeThreshold = 0;
+  uint64_t rmrDeletedSenderEvalClosingSpeedGeThreshold = 0;
   uint64_t highIdealCpmRx = 0;
   uint64_t highTrueCpmRx = 0;
   uint64_t lowIdealCpmRx = 0;
@@ -2192,6 +2215,73 @@ AccumulateThesisRecognitionSample ()
             }
         }
 
+      auto hasFreshGenerationUpdate =
+          [selfStationId, now] (
+              const std::unordered_map<uint64_t,
+                                       std::unordered_map<uint64_t, Time>>& updates,
+              uint64_t stationId,
+              double thresholdMs) {
+            const auto receiverIt = updates.find (selfStationId);
+            if (receiverIt == updates.end ())
+              {
+                return false;
+              }
+            const auto stationIt = receiverIt->second.find (stationId);
+            return stationIt != receiverIt->second.end () &&
+                   (now - stationIt->second).GetMilliSeconds () <= thresholdMs;
+          };
+      auto freshRedundancyCount = [&] (uint64_t stationId, double thresholdMs) {
+        uint32_t count = sensorRecognizedStationIds.count (stationId) > 0 ? 1 : 0;
+        if (hasFreshGenerationUpdate (g_latestNrCpmGenerationTimeByReceiver,
+                                      stationId,
+                                      thresholdMs))
+          {
+            ++count;
+          }
+        if (hasFreshGenerationUpdate (g_latestMecCpmGenerationTimeByReceiver,
+                                      stationId,
+                                      thresholdMs))
+          {
+            ++count;
+          }
+        return count;
+      };
+      std::unordered_map<uint64_t, uint32_t> freshRedundancy200ByStation;
+      std::unordered_map<uint64_t, uint32_t> freshRedundancy500ByStation;
+      for (const uint64_t stationId : expectedStationIds)
+        {
+          const uint32_t fresh200 =
+              freshRedundancyCount (stationId, g_idealMecAoiThresholdsMs[0]);
+          const uint32_t fresh500 =
+              freshRedundancyCount (stationId, g_idealMecAoiThresholdsMs[3]);
+          freshRedundancy200ByStation[stationId] = fresh200;
+          freshRedundancy500ByStation[stationId] = fresh500;
+
+          g_thesisStats.receiverFreshRedundancy200Sum += fresh200;
+          g_thesisStats.receiverFreshRedundancy500Sum += fresh500;
+          g_thesisStats.receiverRv200Sum += std::min (1.0, static_cast<double> (fresh200) / 2.0);
+          ++g_thesisStats.receiverFreshRedundancySamples;
+          if (fresh200 >= 2)
+            {
+              ++g_thesisStats.receiverFreshRedundancyGe2_200;
+            }
+          if (fresh500 >= 2)
+            {
+              ++g_thesisStats.receiverFreshRedundancyGe2_500;
+            }
+
+          if (highPriorityExpectedStationIds.count (stationId) > 0)
+            {
+              g_thesisStats.receiverFreshRedundancyHigh200Sum += fresh200;
+              ++g_thesisStats.receiverFreshRedundancyHighSamples;
+            }
+          else
+            {
+              g_thesisStats.receiverFreshRedundancyLow200Sum += fresh200;
+              ++g_thesisStats.receiverFreshRedundancyLowSamples;
+            }
+        }
+
       std::set<uint64_t> cpmRecognizedStationIds;
       uint32_t ttlViolationObjects = 0;
       uint32_t neverReceivedObjects = 0;
@@ -2367,12 +2457,24 @@ AccumulateThesisRecognitionSample ()
               senderEntry.second.nrContainer->getCPBasicService ()->getLastRmrDeletedIds ();
           for (const uint64_t deletedId : deletedIds)
             {
-              if (expectedStationIds.count (deletedId) == 0 ||
-                  sensorRecognizedStationIds.count (deletedId) > 0)
+              uint64_t resolvedDeletedId = deletedId;
+              if (expectedStationIds.count (resolvedDeletedId) == 0 &&
+                  expectedStationIds.count (deletedId + 1) > 0)
+                {
+                  resolvedDeletedId = deletedId + 1;
+                }
+              else if (deletedId > 0 && expectedStationIds.count (resolvedDeletedId) == 0 &&
+                       expectedStationIds.count (deletedId - 1) > 0)
+                {
+                  resolvedDeletedId = deletedId - 1;
+                }
+              if (expectedStationIds.count (resolvedDeletedId) == 0 ||
+                  sensorRecognizedStationIds.count (resolvedDeletedId) > 0)
                 {
                   continue;
                 }
-              const bool highPriority = highPriorityExpectedStationIds.count (deletedId) > 0;
+              const bool highPriority =
+                  highPriorityExpectedStationIds.count (resolvedDeletedId) > 0;
               ++g_thesisStats.rmrDeletedEvalExpectedTotal;
               if (highPriority)
                 {
@@ -2382,7 +2484,66 @@ AccumulateThesisRecognitionSample ()
                 {
                   ++g_thesisStats.rmrDeletedEvalExpectedLow;
                 }
-              if (recognizedStationIds.count (deletedId) == 0)
+              const auto deletedPositionIt = activeStationPositions.find (resolvedDeletedId);
+              if (deletedPositionIt != activeStationPositions.end ())
+                {
+                  const Vector selfPosition = activeStationPositions[selfStationId];
+                  const Vector deletedPosition = deletedPositionIt->second;
+                  const double dx = deletedPosition.x - selfPosition.x;
+                  const double dy = deletedPosition.y - selfPosition.y;
+                  const double dz = deletedPosition.z - selfPosition.z;
+                  const double distanceMeters = std::sqrt ((dx * dx) + (dy * dy) + (dz * dz));
+                  g_thesisStats.rmrDeletedEvalDistanceSum += distanceMeters;
+                  ++g_thesisStats.rmrDeletedEvalDistanceSamples;
+
+                  const auto selfPrevIt = g_priorityMotionHistory.find (selfStationId);
+                  const auto deletedPrevIt = g_priorityMotionHistory.find (resolvedDeletedId);
+                  if (selfPrevIt != g_priorityMotionHistory.end () &&
+                      deletedPrevIt != g_priorityMotionHistory.end () &&
+                      distanceMeters > 1e-6)
+                    {
+                      const double selfDt = (now - selfPrevIt->second.timestamp).GetSeconds ();
+                      const double deletedDt =
+                          (now - deletedPrevIt->second.timestamp).GetSeconds ();
+                      if (selfDt > 0.0 && deletedDt > 0.0)
+                        {
+                          const Vector selfDelta = selfPosition - selfPrevIt->second.position;
+                          const Vector deletedDelta =
+                              deletedPosition - deletedPrevIt->second.position;
+                          const Vector selfVelocity (selfDelta.x / selfDt,
+                                                     selfDelta.y / selfDt,
+                                                     selfDelta.z / selfDt);
+                          const Vector deletedVelocity (deletedDelta.x / deletedDt,
+                                                        deletedDelta.y / deletedDt,
+                                                        deletedDelta.z / deletedDt);
+                          const Vector relativePosition = deletedPosition - selfPosition;
+                          const Vector relativeVelocity = deletedVelocity - selfVelocity;
+                          const double rangeRate =
+                              ((relativePosition.x * relativeVelocity.x) +
+                               (relativePosition.y * relativeVelocity.y) +
+                               (relativePosition.z * relativeVelocity.z)) /
+                              distanceMeters;
+                          const double closingSpeed = -rangeRate;
+                          if (closingSpeed >= g_priorityClosingSpeedThresholdMps)
+                            {
+                              ++g_thesisStats.rmrDeletedEvalClosingSpeedGeThreshold;
+                              if (distanceMeters / closingSpeed <= g_priorityTtcThresholdSeconds)
+                                {
+                                  ++g_thesisStats.rmrDeletedEvalTtcLeThreshold;
+                                }
+                            }
+                        }
+                    }
+                }
+              if (freshRedundancy200ByStation[resolvedDeletedId] >= 2)
+                {
+                  ++g_thesisStats.rmrDeletedEvalFreshRedundancyGe2_200;
+                }
+              if (freshRedundancy500ByStation[resolvedDeletedId] >= 2)
+                {
+                  ++g_thesisStats.rmrDeletedEvalFreshRedundancyGe2_500;
+                }
+              if (recognizedStationIds.count (resolvedDeletedId) == 0)
                 {
                   ++g_thesisStats.rmrDeletedEvalUnrecognizedTotal;
                   if (highPriority)
@@ -2489,6 +2650,105 @@ AccumulateThesisRecognitionSample ()
               Clamp01 (static_cast<double> (cooperativeRecognizedObjects) /
                        static_cast<double> (cooperativeExpectedStationIds.size ()));
           ++g_thesisStats.cooperativeRecognitionVehicleSamples;
+        }
+    }
+
+  for (const auto& senderEntry : g_vehicleRuntime)
+    {
+      if (senderEntry.second.nrContainer == nullptr)
+        {
+          continue;
+        }
+      const uint64_t senderStationId = VehicleIdToStationId (senderEntry.first);
+      const auto senderPositionIt = activeStationPositions.find (senderStationId);
+      if (senderPositionIt == activeStationPositions.end ())
+        {
+          continue;
+        }
+      const auto& deletedIds =
+          senderEntry.second.nrContainer->getCPBasicService ()->getLastRmrDeletedIds ();
+      for (const uint64_t deletedId : deletedIds)
+        {
+          uint64_t resolvedDeletedId = deletedId;
+          if (activeStationPositions.find (resolvedDeletedId) == activeStationPositions.end () &&
+              activeStationPositions.find (deletedId + 1) != activeStationPositions.end ())
+            {
+              resolvedDeletedId = deletedId + 1;
+            }
+          else if (deletedId > 0 &&
+                   activeStationPositions.find (resolvedDeletedId) == activeStationPositions.end () &&
+                   activeStationPositions.find (deletedId - 1) != activeStationPositions.end ())
+            {
+              resolvedDeletedId = deletedId - 1;
+            }
+          const auto deletedPositionIt = activeStationPositions.find (resolvedDeletedId);
+          if (deletedPositionIt == activeStationPositions.end ())
+            {
+              continue;
+            }
+          const Vector senderPosition = senderPositionIt->second;
+          const Vector deletedPosition = deletedPositionIt->second;
+          const double dx = deletedPosition.x - senderPosition.x;
+          const double dy = deletedPosition.y - senderPosition.y;
+          const double dz = deletedPosition.z - senderPosition.z;
+          const double distanceMeters = std::sqrt ((dx * dx) + (dy * dy) + (dz * dz));
+          const bool highPriority =
+              distanceMeters <= g_priorityDistanceThresholdMeters ||
+              IsClosingHighPriorityObject (senderStationId,
+                                           resolvedDeletedId,
+                                           senderPosition,
+                                           deletedPosition,
+                                           distanceMeters,
+                                           now);
+          ++g_thesisStats.rmrDeletedSenderEvalTotal;
+          if (highPriority)
+            {
+              ++g_thesisStats.rmrDeletedSenderEvalHigh;
+            }
+          else
+            {
+              ++g_thesisStats.rmrDeletedSenderEvalLow;
+            }
+          g_thesisStats.rmrDeletedSenderEvalDistanceSum += distanceMeters;
+          ++g_thesisStats.rmrDeletedSenderEvalDistanceSamples;
+
+          const auto senderPrevIt = g_priorityMotionHistory.find (senderStationId);
+          const auto deletedPrevIt = g_priorityMotionHistory.find (resolvedDeletedId);
+          if (senderPrevIt == g_priorityMotionHistory.end () ||
+              deletedPrevIt == g_priorityMotionHistory.end () || distanceMeters <= 1e-6)
+            {
+              continue;
+            }
+          const double senderDt = (now - senderPrevIt->second.timestamp).GetSeconds ();
+          const double deletedDt = (now - deletedPrevIt->second.timestamp).GetSeconds ();
+          if (senderDt <= 0.0 || deletedDt <= 0.0)
+            {
+              continue;
+            }
+          const Vector senderDelta = senderPosition - senderPrevIt->second.position;
+          const Vector deletedDelta = deletedPosition - deletedPrevIt->second.position;
+          const Vector senderVelocity (senderDelta.x / senderDt,
+                                       senderDelta.y / senderDt,
+                                       senderDelta.z / senderDt);
+          const Vector deletedVelocity (deletedDelta.x / deletedDt,
+                                        deletedDelta.y / deletedDt,
+                                        deletedDelta.z / deletedDt);
+          const Vector relativePosition = deletedPosition - senderPosition;
+          const Vector relativeVelocity = deletedVelocity - senderVelocity;
+          const double rangeRate =
+              ((relativePosition.x * relativeVelocity.x) +
+               (relativePosition.y * relativeVelocity.y) +
+               (relativePosition.z * relativeVelocity.z)) /
+              distanceMeters;
+          const double closingSpeed = -rangeRate;
+          if (closingSpeed >= g_priorityClosingSpeedThresholdMps)
+            {
+              ++g_thesisStats.rmrDeletedSenderEvalClosingSpeedGeThreshold;
+              if (distanceMeters / closingSpeed <= g_priorityTtcThresholdSeconds)
+                {
+                  ++g_thesisStats.rmrDeletedSenderEvalTtcLeThreshold;
+                }
+            }
         }
     }
 
@@ -2752,6 +3012,16 @@ PercentFromRatioSum (double ratioSum, uint64_t samples)
       return -1.0;
     }
   return 100.0 * ratioSum / static_cast<double> (samples);
+}
+
+static double
+AverageFromSum (double sum, uint64_t samples)
+{
+  if (samples == 0)
+    {
+      return -1.0;
+    }
+  return sum / static_cast<double> (samples);
 }
 
 static double
@@ -3324,12 +3594,18 @@ OpenObservationLog (const std::string& path)
       << "nr_rmr_deleted_last,nr_rmr_deleted_near_last,nr_rmr_deleted_far_last,"
       << "nr_cpm_objects_total,nr_rmr_candidates_total,nr_rmr_deleted_total,"
       << "nr_rmr_deleted_near_total,nr_rmr_deleted_far_total,"
+      << "nr_rmr_deleted_feature_count,nr_rmr_deleted_distance_mean_m,"
+      << "nr_rmr_deleted_frequency_mean,nr_rmr_deleted_position_change_mean_m,"
+      << "nr_rmr_deleted_speed_change_mean_mps,nr_rmr_deleted_score_mean,"
       << "nr_cpm_size_bytes,nr_cpm_size_bytes_total,"
       << "mec_cpm_objects,mec_rmr_candidates,mec_rmr_deleted_last,"
       << "mec_rmr_deleted_near_last,mec_rmr_deleted_far_last,"
       << "mec_cpm_objects_total,mec_rmr_candidates_total,mec_rmr_deleted_total,"
       << "mec_rmr_deleted_near_total,mec_rmr_deleted_far_total,"
       << "mec_cpm_size_bytes,mec_cpm_size_bytes_total,"
+      << "rmr_deleted_feature_count,rmr_deleted_distance_mean_m,"
+      << "rmr_deleted_frequency_mean,rmr_deleted_position_change_mean_m,"
+      << "rmr_deleted_speed_change_mean_mps,rmr_deleted_score_mean,"
       << "legacy_cpm_wannabe_sent,legacy_cpm_sent,"
       << "nr_cpm_wannabe_sent,nr_cpm_sent,"
       << "mec_cpm_wannabe_sent,mec_cpm_sent,"
@@ -3382,9 +3658,24 @@ OpenObservationLog (const std::string& path)
       << "ttl_violation_rate,never_received_rate,"
       << "high_ttl_violation_rate,high_never_received_rate,"
       << "low_ttl_violation_rate,low_never_received_rate,"
+      << "receiver_fresh_redundancy_200ms_mean,receiver_fresh_redundancy_500ms_mean,"
+      << "receiver_fresh_redundancy_ge2_200ms_rate,"
+      << "receiver_fresh_redundancy_ge2_500ms_rate,"
+      << "receiver_high_fresh_redundancy_200ms_mean,"
+      << "receiver_low_fresh_redundancy_200ms_mean,"
+      << "receiver_rv_200ms_score,"
       << "rmr_deleted_eval_expected_total,rmr_deleted_eval_expected_high,"
       << "rmr_deleted_eval_expected_low,rmr_deleted_eval_unrecognized_total,"
       << "rmr_deleted_eval_unrecognized_high,rmr_deleted_eval_unrecognized_low,"
+      << "rmr_deleted_eval_distance_mean_m,"
+      << "rmr_deleted_eval_fresh_redundancy_ge2_200ms_rate,"
+      << "rmr_deleted_eval_fresh_redundancy_ge2_500ms_rate,"
+      << "rmr_deleted_eval_closing_speed_ge_threshold_rate,"
+      << "rmr_deleted_eval_ttc_le_threshold_rate,"
+      << "rmr_deleted_sender_eval_total,rmr_deleted_sender_eval_high,"
+      << "rmr_deleted_sender_eval_low,rmr_deleted_sender_eval_distance_mean_m,"
+      << "rmr_deleted_sender_eval_closing_speed_ge_threshold_rate,"
+      << "rmr_deleted_sender_eval_ttc_le_threshold_rate,"
       << "active_all_vehicles,rsu_i2v_vehicle_count,rsu_i2v_predicted_cbr_avg,"
       << "rsu_i2v_prediction_lead_time_avg" << std::endl;
 }
@@ -3734,6 +4025,12 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
   double predictedCbrMax = -1.0;
   double cbrRateSum = 0.0;
   double cpmTxRateSum = 0.0;
+  uint64_t rmrDeletedFeatureCount = 0;
+  double rmrDeletedDistanceSum = 0.0;
+  double rmrDeletedFrequencySum = 0.0;
+  double rmrDeletedPositionChangeSum = 0.0;
+  double rmrDeletedSpeedChangeSum = 0.0;
+  double rmrDeletedScoreSum = 0.0;
   uint32_t dsrcCpmObjects = 0;
   uint32_t dsrcRmrCandidates = 0;
   uint32_t dsrcRmrDeletedLast = 0;
@@ -3759,6 +4056,12 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
   uint64_t nrRmrDeletedTotal = 0;
   uint64_t nrRmrDeletedNearTotal = 0;
   uint64_t nrRmrDeletedFarTotal = 0;
+  uint64_t nrRmrDeletedFeatureCount = 0;
+  double nrRmrDeletedDistanceSum = 0.0;
+  double nrRmrDeletedFrequencySum = 0.0;
+  double nrRmrDeletedPositionChangeSum = 0.0;
+  double nrRmrDeletedSpeedChangeSum = 0.0;
+  double nrRmrDeletedScoreSum = 0.0;
   uint64_t nrCpmSizeBytesTotal = 0;
   uint64_t nrCpmWannabeSent = 0;
   uint64_t nrCpmSent = 0;
@@ -3830,6 +4133,12 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
       dsrcCpmObjectsTotal += dsrcCp->getTotalRmrIncludedObjectCount ();
       dsrcRmrCandidatesTotal += dsrcCp->getTotalRmrCandidateCount ();
       dsrcRmrDeletedTotal += dsrcCp->getTotalRmrDeletedObjectCount ();
+      rmrDeletedFeatureCount += dsrcCp->getTotalRmrDeletedFeatureCount ();
+      rmrDeletedDistanceSum += dsrcCp->getTotalRmrDeletedDistanceSum ();
+      rmrDeletedFrequencySum += dsrcCp->getTotalRmrDeletedFrequencySum ();
+      rmrDeletedPositionChangeSum += dsrcCp->getTotalRmrDeletedPositionChangeSum ();
+      rmrDeletedSpeedChangeSum += dsrcCp->getTotalRmrDeletedSpeedChangeSum ();
+      rmrDeletedScoreSum += dsrcCp->getTotalRmrDeletedScoreSum ();
       dsrcCpmSizeBytes += dsrcCp->getLastCpmSizeBytes ();
       dsrcCpmSizeBytesTotal += dsrcCp->getTotalCpmSizeBytes ();
       dsrcCpmWannabeSent += dsrcCp->getWannabeSent ();
@@ -3844,6 +4153,18 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
           nrCpmObjectsTotal += nrCp->getTotalRmrIncludedObjectCount ();
           nrRmrCandidatesTotal += nrCp->getTotalRmrCandidateCount ();
           nrRmrDeletedTotal += nrCp->getTotalRmrDeletedObjectCount ();
+          nrRmrDeletedFeatureCount += nrCp->getTotalRmrDeletedFeatureCount ();
+          rmrDeletedFeatureCount += nrCp->getTotalRmrDeletedFeatureCount ();
+          nrRmrDeletedDistanceSum += nrCp->getTotalRmrDeletedDistanceSum ();
+          rmrDeletedDistanceSum += nrCp->getTotalRmrDeletedDistanceSum ();
+          nrRmrDeletedFrequencySum += nrCp->getTotalRmrDeletedFrequencySum ();
+          rmrDeletedFrequencySum += nrCp->getTotalRmrDeletedFrequencySum ();
+          nrRmrDeletedPositionChangeSum += nrCp->getTotalRmrDeletedPositionChangeSum ();
+          rmrDeletedPositionChangeSum += nrCp->getTotalRmrDeletedPositionChangeSum ();
+          nrRmrDeletedSpeedChangeSum += nrCp->getTotalRmrDeletedSpeedChangeSum ();
+          rmrDeletedSpeedChangeSum += nrCp->getTotalRmrDeletedSpeedChangeSum ();
+          nrRmrDeletedScoreSum += nrCp->getTotalRmrDeletedScoreSum ();
+          rmrDeletedScoreSum += nrCp->getTotalRmrDeletedScoreSum ();
           nrCpmSizeBytes += nrCp->getLastCpmSizeBytes ();
           nrCpmSizeBytesTotal += nrCp->getTotalCpmSizeBytes ();
           nrCpmWannabeSent += nrCp->getWannabeSent ();
@@ -3859,6 +4180,12 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
           mecCpmObjectsTotal += mecCp->getTotalRmrIncludedObjectCount ();
           mecRmrCandidatesTotal += mecCp->getTotalRmrCandidateCount ();
           mecRmrDeletedTotal += mecCp->getTotalRmrDeletedObjectCount ();
+          rmrDeletedFeatureCount += mecCp->getTotalRmrDeletedFeatureCount ();
+          rmrDeletedDistanceSum += mecCp->getTotalRmrDeletedDistanceSum ();
+          rmrDeletedFrequencySum += mecCp->getTotalRmrDeletedFrequencySum ();
+          rmrDeletedPositionChangeSum += mecCp->getTotalRmrDeletedPositionChangeSum ();
+          rmrDeletedSpeedChangeSum += mecCp->getTotalRmrDeletedSpeedChangeSum ();
+          rmrDeletedScoreSum += mecCp->getTotalRmrDeletedScoreSum ();
           mecCpmSizeBytes += mecCp->getLastCpmSizeBytes ();
           mecCpmSizeBytesTotal += mecCp->getTotalCpmSizeBytes ();
           mecCpmWannabeSent += mecCp->getWannabeSent ();
@@ -4017,14 +4344,44 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << nrRmrDeletedNearLast << "," << nrRmrDeletedFarLast << ","
                        << nrCpmObjectsTotal << "," << nrRmrCandidatesTotal << ","
                        << nrRmrDeletedTotal << "," << nrRmrDeletedNearTotal << ","
-                       << nrRmrDeletedFarTotal << "," << nrCpmSizeBytes << ","
+                       << nrRmrDeletedFarTotal << "," << nrRmrDeletedFeatureCount << ","
+                       << FormatThesisMetric (AverageFromSum (nrRmrDeletedDistanceSum,
+                                                               nrRmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (nrRmrDeletedFrequencySum,
+                                                               nrRmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (nrRmrDeletedPositionChangeSum,
+                                                               nrRmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (nrRmrDeletedSpeedChangeSum,
+                                                               nrRmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (nrRmrDeletedScoreSum,
+                                                               nrRmrDeletedFeatureCount))
+                       << "," << nrCpmSizeBytes << ","
                        << nrCpmSizeBytesTotal << "," << mecCpmObjects << ","
                        << mecRmrCandidates << "," << mecRmrDeletedLast << ","
                        << mecRmrDeletedNearLast << "," << mecRmrDeletedFarLast << ","
                        << mecCpmObjectsTotal << "," << mecRmrCandidatesTotal << ","
                        << mecRmrDeletedTotal << "," << mecRmrDeletedNearTotal << ","
                        << mecRmrDeletedFarTotal << "," << mecCpmSizeBytes << ","
-                       << mecCpmSizeBytesTotal << ","
+                       << mecCpmSizeBytesTotal << "," << rmrDeletedFeatureCount << ","
+                       << FormatThesisMetric (AverageFromSum (rmrDeletedDistanceSum,
+                                                               rmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (rmrDeletedFrequencySum,
+                                                               rmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (rmrDeletedPositionChangeSum,
+                                                               rmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (rmrDeletedSpeedChangeSum,
+                                                               rmrDeletedFeatureCount))
+                       << ","
+                       << FormatThesisMetric (AverageFromSum (rmrDeletedScoreSum,
+                                                               rmrDeletedFeatureCount))
+                       << ","
                        << dsrcCpmWannabeSent << "," << dsrcCpmSent << ","
                        << nrCpmWannabeSent << "," << nrCpmSent << ","
                        << mecCpmWannabeSent << "," << mecCpmSent << ","
@@ -4186,12 +4543,60 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << FormatThesisMetric (highNeverReceivedRate) << ","
                        << FormatThesisMetric (lowTtlViolationRate) << ","
                        << FormatThesisMetric (lowNeverReceivedRate) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverFreshRedundancy200Sum,
+                              g_thesisStats.receiverFreshRedundancySamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverFreshRedundancy500Sum,
+                              g_thesisStats.receiverFreshRedundancySamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.receiverFreshRedundancyGe2_200,
+                              g_thesisStats.receiverFreshRedundancySamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.receiverFreshRedundancyGe2_500,
+                              g_thesisStats.receiverFreshRedundancySamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverFreshRedundancyHigh200Sum,
+                              g_thesisStats.receiverFreshRedundancyHighSamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverFreshRedundancyLow200Sum,
+                              g_thesisStats.receiverFreshRedundancyLowSamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverRv200Sum,
+                              g_thesisStats.receiverFreshRedundancySamples)) << ","
                        << g_thesisStats.rmrDeletedEvalExpectedTotal << ","
                        << g_thesisStats.rmrDeletedEvalExpectedHigh << ","
                        << g_thesisStats.rmrDeletedEvalExpectedLow << ","
                        << g_thesisStats.rmrDeletedEvalUnrecognizedTotal << ","
                        << g_thesisStats.rmrDeletedEvalUnrecognizedHigh << ","
                        << g_thesisStats.rmrDeletedEvalUnrecognizedLow << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.rmrDeletedEvalDistanceSum,
+                              g_thesisStats.rmrDeletedEvalDistanceSamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.rmrDeletedEvalFreshRedundancyGe2_200,
+                              g_thesisStats.rmrDeletedEvalExpectedTotal)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.rmrDeletedEvalFreshRedundancyGe2_500,
+                              g_thesisStats.rmrDeletedEvalExpectedTotal)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.rmrDeletedEvalClosingSpeedGeThreshold,
+                              g_thesisStats.rmrDeletedEvalDistanceSamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.rmrDeletedEvalTtcLeThreshold,
+                              g_thesisStats.rmrDeletedEvalDistanceSamples)) << ","
+                       << g_thesisStats.rmrDeletedSenderEvalTotal << ","
+                       << g_thesisStats.rmrDeletedSenderEvalHigh << ","
+                       << g_thesisStats.rmrDeletedSenderEvalLow << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.rmrDeletedSenderEvalDistanceSum,
+                              g_thesisStats.rmrDeletedSenderEvalDistanceSamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.rmrDeletedSenderEvalClosingSpeedGeThreshold,
+                              g_thesisStats.rmrDeletedSenderEvalDistanceSamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.rmrDeletedSenderEvalTtcLeThreshold,
+                              g_thesisStats.rmrDeletedSenderEvalDistanceSamples)) << ","
                        << g_allVehicleNodes.size () << ","
                        << g_trafficFlowPrediction.i2vVehicleCount << ","
                        << g_trafficFlowPrediction.i2vPredictedCbrAvg << ","
@@ -7319,6 +7724,24 @@ main (int argc, char* argv[])
           << "ttl_violation_rate,never_received_rate,"
           << "high_ttl_violation_rate,high_never_received_rate,"
           << "low_ttl_violation_rate,low_never_received_rate,"
+          << "receiver_fresh_redundancy_200ms_mean,receiver_fresh_redundancy_500ms_mean,"
+          << "receiver_fresh_redundancy_ge2_200ms_rate,"
+          << "receiver_fresh_redundancy_ge2_500ms_rate,"
+          << "receiver_high_fresh_redundancy_200ms_mean,"
+          << "receiver_low_fresh_redundancy_200ms_mean,"
+          << "receiver_rv_200ms_score,"
+          << "rmr_deleted_eval_expected_total,rmr_deleted_eval_expected_high,"
+          << "rmr_deleted_eval_expected_low,rmr_deleted_eval_unrecognized_total,"
+          << "rmr_deleted_eval_unrecognized_high,rmr_deleted_eval_unrecognized_low,"
+          << "rmr_deleted_eval_distance_mean_m,"
+          << "rmr_deleted_eval_fresh_redundancy_ge2_200ms_rate,"
+          << "rmr_deleted_eval_fresh_redundancy_ge2_500ms_rate,"
+          << "rmr_deleted_eval_closing_speed_ge_threshold_rate,"
+          << "rmr_deleted_eval_ttc_le_threshold_rate,"
+          << "rmr_deleted_sender_eval_total,rmr_deleted_sender_eval_high,"
+          << "rmr_deleted_sender_eval_low,rmr_deleted_sender_eval_distance_mean_m,"
+          << "rmr_deleted_sender_eval_closing_speed_ge_threshold_rate,"
+          << "rmr_deleted_sender_eval_ttc_le_threshold_rate,"
           << "sensor_external_event_candidate_vehicles,sensor_external_event_selected_vehicles,"
           << "sensor_external_event_count,sensor_external_event_recognized,"
           << "sensor_external_event_missed,sensor_external_event_censored,"
@@ -7407,6 +7830,60 @@ main (int argc, char* argv[])
                  << FormatThesisMetric (highNeverReceivedRate) << ","
                  << FormatThesisMetric (lowTtlViolationRate) << ","
                  << FormatThesisMetric (lowNeverReceivedRate) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverFreshRedundancy200Sum,
+                        g_thesisStats.receiverFreshRedundancySamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverFreshRedundancy500Sum,
+                        g_thesisStats.receiverFreshRedundancySamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.receiverFreshRedundancyGe2_200,
+                        g_thesisStats.receiverFreshRedundancySamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.receiverFreshRedundancyGe2_500,
+                        g_thesisStats.receiverFreshRedundancySamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverFreshRedundancyHigh200Sum,
+                        g_thesisStats.receiverFreshRedundancyHighSamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverFreshRedundancyLow200Sum,
+                        g_thesisStats.receiverFreshRedundancyLowSamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverRv200Sum,
+                        g_thesisStats.receiverFreshRedundancySamples)) << ","
+                 << g_thesisStats.rmrDeletedEvalExpectedTotal << ","
+                 << g_thesisStats.rmrDeletedEvalExpectedHigh << ","
+                 << g_thesisStats.rmrDeletedEvalExpectedLow << ","
+                 << g_thesisStats.rmrDeletedEvalUnrecognizedTotal << ","
+                 << g_thesisStats.rmrDeletedEvalUnrecognizedHigh << ","
+                 << g_thesisStats.rmrDeletedEvalUnrecognizedLow << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.rmrDeletedEvalDistanceSum,
+                        g_thesisStats.rmrDeletedEvalDistanceSamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.rmrDeletedEvalFreshRedundancyGe2_200,
+                        g_thesisStats.rmrDeletedEvalExpectedTotal)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.rmrDeletedEvalFreshRedundancyGe2_500,
+                        g_thesisStats.rmrDeletedEvalExpectedTotal)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.rmrDeletedEvalClosingSpeedGeThreshold,
+                        g_thesisStats.rmrDeletedEvalDistanceSamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.rmrDeletedEvalTtcLeThreshold,
+                        g_thesisStats.rmrDeletedEvalDistanceSamples)) << ","
+                 << g_thesisStats.rmrDeletedSenderEvalTotal << ","
+                 << g_thesisStats.rmrDeletedSenderEvalHigh << ","
+                 << g_thesisStats.rmrDeletedSenderEvalLow << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.rmrDeletedSenderEvalDistanceSum,
+                        g_thesisStats.rmrDeletedSenderEvalDistanceSamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.rmrDeletedSenderEvalClosingSpeedGeThreshold,
+                        g_thesisStats.rmrDeletedSenderEvalDistanceSamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.rmrDeletedSenderEvalTtcLeThreshold,
+                        g_thesisStats.rmrDeletedSenderEvalDistanceSamples)) << ","
                  << g_sensorExternalEventCandidateVehicles << ","
                  << g_sensorExternalEventSelectedVehicles << ","
                  << g_sensorExternalEventCount << ","
