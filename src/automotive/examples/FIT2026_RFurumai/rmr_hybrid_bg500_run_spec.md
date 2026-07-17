@@ -1,6 +1,6 @@
 # RMR + Hybrid BG500 Run Specification
 
-Date: 2026-07-16 17:58 JST
+Date: 2026-07-17 10:15 JST
 
 Purpose:
 
@@ -10,6 +10,106 @@ Purpose:
   - Hybrid baseline
   - Hybrid + prediction
   - V2N2V-only
+
+## Result Reference
+
+Use these result paths for the current completed comparison:
+
+- Baseline Hybrid:
+  - `results/bg500_hybrid_fixed_seed30_100s_retry/v2n2v-adaptive-probability/summary.csv`
+  - `results/bg500_hybrid_fixed_seed30_100s_retry/v2n2v-adaptive-probability/observation.csv`
+- RMR + Hybrid:
+  - `results/bg500_hybrid_rmr_seed30_100s/v2n2v-adaptive-probability/summary.csv`
+  - `results/bg500_hybrid_rmr_seed30_100s/v2n2v-adaptive-probability/observation.csv`
+
+Summary comparison:
+
+| Metric | Baseline Hybrid | RMR + Hybrid | Interpretation |
+|---|---:|---:|---|
+| ORR | 69.7406 | 98.6314 | Large improvement |
+| High-priority ORR | 70.5270 | 98.7799 | Large improvement |
+| Low-priority ORR | 68.4500 | 98.3786 | Large improvement |
+| Channel busy ratio | 0.802389 | 0.802023 | Almost unchanged |
+| V2V radio loss rate | 63.8187 | 55.7377 | Improved |
+| MEC radio final loss rate | 0.482234 | 0.482234 | Unchanged |
+| MEC update failure rate | 79.4684 | 14.4283 | Large improvement |
+| MEC valid update success rate | 20.5316 | 85.5717 | Large improvement |
+| MEC AoI violation rate, 200 ms | 78.0518 | 22.3451 | Large improvement |
+| MEC AoI violation rate, 500 ms | 68.5561 | 0 | Large improvement |
+| TTL violation rate | 29.1034 | 0.436093 | Large improvement |
+| MEC AoI p99 | 25579 ms | 249 ms | Large improvement |
+| MEC DL busy p99 | 1.0 | 0.911616 | Improved |
+
+Observation final-row comparison:
+
+| Metric | Baseline Hybrid, t=99 | RMR + Hybrid, t=99 | Interpretation |
+|---|---:|---:|---|
+| ORR | 70.0809 | 98.6187 | Large improvement |
+| CBR | 0.825138 | 0.824873 | Almost unchanged |
+| V2V radio loss rate | 63.9561 | 55.9219 | Improved |
+| MEC radio final loss rate | 0.48233 | 0.48233 | Unchanged |
+| MEC AoI violation rate, 200 ms | 77.63 | 22.441 | Large improvement |
+| MEC update failure rate | 79.3431 | 14.5044 | Large improvement |
+| NR CPM size bytes total | 12919837 | 4467518 | 65.42% reduction |
+| NR RMR deleted total | 0 | 187294 | RMR active |
+
+Key interpretation:
+
+- RMR with a maximum deletion count of 40 objects was effective in this BG500 Hybrid scenario.
+- The main benefit is not a change in MEC radio loss. `mec_radio_final_loss_rate` stayed almost identical.
+- The benefit comes from reducing CPM payload volume, which improves MEC freshness and valid update success.
+- The 65.42% reduction is for `nr_cpm_size_bytes_total`, i.e., cumulative NR sidelink CPM payload size. It should not be described as a 65.42% reduction of all communication traffic.
+
+## RMR Direction After This Result
+
+This result shows that the existing delete count set `10/20/40` is already strong enough to improve Hybrid performance.
+
+Do not immediately double or triple the deletion counts as the next step:
+
+- It may further reduce channel load, but it can remove useful object information and hurt ORR.
+- The result already achieves ORR near 98.6%, so aggressive deletion has limited upside and larger risk.
+- A safer next step is to understand which deleted objects were redundant and which were harmful to delete.
+
+Lower-risk improvement ideas without a complex new formula:
+
+- Sweep the existing delete-count set around the current values, for example `5/10/20`, `10/20/40`, and `15/30/60`.
+- Add a cap based on priority so high-priority objects are deleted less aggressively.
+- Add a minimum redundancy guard, such as keeping at least two recent observations for important objects where possible.
+- Log receiver-side redundancy before changing the RMR formula.
+
+Prediction should not be the immediate next main result:
+
+- The current prediction-only Hybrid run made `predicted_channel_busy_ratio_avg` valid, but it did not improve routing because baseline Hybrid was already in full dual transmission early.
+- Prediction may help only after the control policy avoids over-triggering dual transmission or after RMR reduces payload size.
+- If tested, use it after the RMR baseline is stable and compare `RMR + Hybrid` versus `Prediction + RMR + Hybrid`.
+
+## Receiver-Side Redundancy Logging Idea
+
+A useful next research direction is to log redundancy at the receiver side.
+
+Goal:
+
+- Measure how many independent or recent observations each receiver actually has for the same object.
+- Determine whether RMR removes waste while preserving enough redundancy to tolerate packet loss.
+
+Candidate receiver-side metrics:
+
+- `object_observation_redundancy_mean`
+- `object_observation_redundancy_p50`
+- `object_observation_redundancy_p90`
+- `high_priority_redundancy_mean`
+- `low_priority_redundancy_mean`
+- `redundancy_ge_2_rate`
+- `redundancy_ge_3_rate`
+- `fresh_redundancy_ge_2_rate_200ms`
+- `fresh_redundancy_ge_2_rate_500ms`
+
+Interpretation target:
+
+- Redundancy of 0 means the object was never received.
+- Redundancy of 1 means recognition depends on a single update and is fragile.
+- Redundancy of 2 or more suggests packet-loss tolerance through duplicated object knowledge.
+- Excessively high redundancy suggests waste and is a candidate for RMR deletion.
 
 ## Important
 
