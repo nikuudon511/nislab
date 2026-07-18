@@ -1,16 +1,56 @@
 {
-"C_Cpp.intelliSenseEngine": "disabled",
-"clangd.arguments": [
-  "--compile-commands-dir=cmake-build-debug",
-  "--background-index"
-],
-"cmake.debugConfig": {
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "clangd.arguments": [
+    "--compile-commands-dir=cmake-build-debug",
+    "--background-index"
+  ],
+  "cmake.debugConfig": {
     "args": [
-        "--sumo-gui=true"
+      "--sumo-gui=true"
     ],
     "env": {
-        "DISPLAY": "",
-        "LIBGL_ALWAYS_INDIRECT": "1",
+      "DISPLAY": "",
+      "LIBGL_ALWAYS_INDIRECT": "1"
     }
-},
+  },
+  "files.watcherExclude": {
+    "**/results/**": true,
+    "**/opencv/**": true,
+    "**/opencv_contrib/**": true,
+    "**/build/**": true,
+    "**/cmake-cache/**": true
+  },
+  "search.exclude": {
+    "**/results/**": true,
+    "**/opencv/**": true,
+    "**/opencv_contrib/**": true,
+    "**/build/**": true,
+    "**/cmake-cache/**": true
+  },
+  "git.autorefresh": false,
+
+  "latex-workshop.latex.recipe.default": "uplatex -> dvipdfmx",
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "uplatex -> dvipdfmx",
+      "tools": ["uplatex", "dvipdfmx"]
+    }
+  ],
+  "latex-workshop.latex.tools": [
+    {
+      "name": "uplatex",
+      "command": "uplatex",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "%DOC%"
+      ]
+    },
+    {
+      "name": "dvipdfmx",
+      "command": "dvipdfmx",
+      "args": ["%DOCFILE%.dvi"]
+    }
+  ]
 }

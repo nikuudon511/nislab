@@ -22,6 +22,11 @@
 
 #include "MetricSupervisor.h"
 #include "ns3/csv-utils.h"
+#include "ns3/nr-spectrum-phy.h"
+#include "ns3/nr-ue-net-device.h"
+#include "ns3/nr-ue-phy.h"
+#include <algorithm>
+#include <cmath>
 #include <sstream>
 #include <cfloat>
 
@@ -41,6 +46,44 @@ std::unordered_map<std::string, Time> currentBusyCBR;
 std::unordered_map<std::string, std::pair<Time, WifiPhyState>> nodeLastState80211p;
 std::unordered_map<std::string, Time> nodeDurationStateNr;
 Time lastCBRCheck = Time(-1.0);
+
+static double
+MetricSupervisorPercentile (std::vector<double> values, double percentile)
+{
+  if (values.empty ())
+    {
+      return 0.0;
+    }
+  percentile = std::max (0.0, std::min (100.0, percentile));
+  std::sort (values.begin (), values.end ());
+  const double rank = (percentile / 100.0) * static_cast<double> (values.size () - 1);
+  const auto lower = static_cast<std::size_t> (std::floor (rank));
+  const auto upper = static_cast<std::size_t> (std::ceil (rank));
+  if (lower == upper)
+    {
+      return values[lower];
+    }
+  const double weight = rank - static_cast<double> (lower);
+  return values[lower] + ((values[upper] - values[lower]) * weight);
+}
+
+double
+MetricSupervisor::getLatencyPercentile_overall (double percentile) const
+{
+  return MetricSupervisorPercentile (m_latency_samples_ms, percentile);
+}
+
+double
+MetricSupervisor::getLatencyPercentile_messagetype (messageType_e messagetype,
+                                                    double percentile) const
+{
+  const auto it = m_latency_samples_ms_per_messagetype.find (messagetype);
+  if (it == m_latency_samples_ms_per_messagetype.end ())
+    {
+      return 0.0;
+    }
+  return MetricSupervisorPercentile (it->second, percentile);
+}
 
 TypeId
 MetricSupervisor::GetTypeId ()
@@ -241,6 +284,7 @@ MetricSupervisor::signalReceivedPacket(std::string buf, uint64_t nodeID)
     {
       curr_latency_ms = static_cast<double>(Simulator::Now ().GetNanoSeconds () - m_latency_map[buf])/1000000.0;
       m_count_latency++;
+      m_latency_samples_ms.push_back (curr_latency_ms);
 
       m_avg_latency_ms += (curr_latency_ms-m_avg_latency_ms)/m_count_latency;
 
@@ -298,6 +342,7 @@ MetricSupervisor::signalReceivedPacket(std::string buf, uint64_t nodeID)
         }
 
       m_count_latency_per_messagetype[messagetype]++;
+      m_latency_samples_ms_per_messagetype[messagetype].push_back (curr_latency_ms);
       m_avg_latency_ms_per_messagetype[messagetype] += (curr_latency_ms - m_avg_latency_ms_per_messagetype[messagetype])/m_count_latency_per_messagetype[messagetype];
 
       if(m_prr_verbose_stdout == true) {
@@ -493,25 +538,16 @@ storeCBR80211p (std::string context, Time start, Time duration, WifiPhyState sta
 }
 
 void
-storeCBRNr(std::string context, Time duration)
+storeCBRNrForNode (std::string node, Time duration)
 {
-  // In this case Duration is the time the channel will be in a busy state (referred to the future)
-  std::size_t first = context.find ("/NodeList/") + 10; // 10 is the length of "/NodeList/"
-  std::size_t last = context.find ("/", first);
-  std::string node = context.substr (first, last - first);
-
-  // How long the state will last for the other nodes?
-  // This management will be useful when the CheckCBR function will start (see below)
-  for (auto it = nodeDurationStateNr.begin(); it != nodeDurationStateNr.end(); ++it)
+  const Time now = Simulator::Now ();
+  const Time previousEnd = std::max (nodeDurationStateNr[node], now);
+  const Time newEnd = now + duration;
+  if (newEnd > previousEnd)
     {
-      if (it->first != node) nodeDurationStateNr[it->first] = Simulator::Now() + duration;
+      currentBusyCBR[node] += newEnd - previousEnd;
+      nodeDurationStateNr[node] = newEnd;
     }
-
-  for (auto it = currentBusyCBR.begin(); it != currentBusyCBR.end(); ++it)
-    {
-      if (it->first != node) it->second += duration;
-    }
-
 }
 
 void
@@ -560,7 +596,8 @@ MetricSupervisor::checkCBR ()
                 }
             }
 
-          double currentCbr = busyCbr.GetDouble () / (m_cbr_window * 1e6);
+          double currentCbr =
+              std::clamp (busyCbr.GetDouble () / (m_cbr_window * 1e6), 0.0, 1.0);
           if (false) std::cout << Simulator::Now().GetSeconds() << "s - Node " << node_id << " - CBR: " << 100 * currentCbr << std::endl;
 
           if (m_average_cbr.find (item) != m_average_cbr.end ())
@@ -751,11 +788,28 @@ MetricSupervisor::startCheckCBR (int num_nodes)
         }
       else if (m_channel_technology == "Nr")
         {
-          oss << "/NodeList/" << node->GetId() << "/DeviceList/*/$ns3::NrUeNetDevice/ComponentCarrierMapUe/*/NrUePhy/NrSpectrumPhyList/*/ChannelOccupied";
-          std::string var = oss.str();
-          Config::Connect(var, MakeCallback(&storeCBRNr));
-          currentBusyCBR[std::to_string (node->GetId())] = Time(0);
-          nodeDurationStateNr[std::to_string (node->GetId())] = Time(0);
+          const std::string nodeId = std::to_string (node->GetId ());
+          currentBusyCBR[nodeId] = Time (0);
+          nodeDurationStateNr[nodeId] = Time (0);
+          for (uint32_t deviceIndex = 0; deviceIndex < node->GetNDevices (); ++deviceIndex)
+            {
+              Ptr<NrUeNetDevice> ueDevice =
+                  DynamicCast<NrUeNetDevice> (node->GetDevice (deviceIndex));
+              if (ueDevice == nullptr)
+                {
+                  continue;
+                }
+              for (uint32_t bwpIndex = 0; bwpIndex < ueDevice->GetCcMapSize (); ++bwpIndex)
+                {
+                  Ptr<NrUePhy> phy = ueDevice->GetPhy (bwpIndex);
+                  for (uint8_t stream = 0; stream < phy->GetNumberOfStreams (); ++stream)
+                    {
+                      phy->GetSpectrumPhy (stream)->TraceConnectWithoutContext (
+                          "ChannelOccupied",
+                          MakeBoundCallback (&storeCBRNrForNode, nodeId));
+                    }
+                }
+            }
         }
     }
 

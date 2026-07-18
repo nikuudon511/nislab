@@ -1,0 +1,10 @@
+<configuration>
+    <input>
+        <net-file value="straight_1km.net.xml"/>
+        <route-files value="straight_1km.rou.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end value="240"/>
+    </time>
+</configuration>

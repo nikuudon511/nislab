@@ -1,0 +1,4 @@
+<edges>
+    <edge id="mainline" from="start" to="merge" numLanes="2" speed="27.78"/>
+    <edge id="bottleneck" from="merge" to="end" numLanes="1" speed="8.33"/>
+</edges>

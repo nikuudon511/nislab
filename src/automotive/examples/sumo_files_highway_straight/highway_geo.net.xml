@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-07-09T21:13:05.558140+09:00 by Eclipse SUMO netconvert 1.26.0
+<netconvertConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
+
+    <input>
+        <node-files value="src/automotive/examples/sumo_files_highway_straight/highway_geo.nod.xml"/>
+        <edge-files value="src/automotive/examples/sumo_files_highway_straight/highway.edg.xml"/>
+    </input>
+
+    <output>
+        <output-file value="src/automotive/examples/sumo_files_highway_straight/highway_geo.net.xml"/>
+    </output>
+
+    <projection>
+        <proj.utm value="true"/>
+    </projection>
+
+</netconvertConfiguration>
+-->
+
+<net version="1.20" junctionCornerDetail="5" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
+
+    <location netOffset="-317483.75,-3874803.01" convBoundary="0.00,0.00,3003.12,75.60" origBoundary="139.000000,34.999928,139.032900,35.000072" projParameter="+proj=utm +zone=54 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
+
+    <edge id="highway_eb" from="eb_start" to="eb_end" priority="3" spreadType="center">
+        <lane id="highway_eb_0" index="0" speed="27.78" length="3003.39" width="4.00" shape="-0.08,55.65 3002.72,-4.00"/>
+        <lane id="highway_eb_1" index="1" speed="27.78" length="3003.39" width="4.00" shape="0.00,59.65 3002.80,-0.00"/>
+        <lane id="highway_eb_2" index="2" speed="27.78" length="3003.39" width="4.00" shape="0.08,63.65 3002.88,4.00"/>
+    </edge>
+    <edge id="highway_wb" from="wb_start" to="wb_end" priority="3" spreadType="center">
+        <lane id="highway_wb_0" index="0" speed="27.78" length="3003.39" width="4.00" shape="3003.20,19.95 0.40,79.60"/>
+        <lane id="highway_wb_1" index="1" speed="27.78" length="3003.39" width="4.00" shape="3003.12,15.95 0.32,75.60"/>
+        <lane id="highway_wb_2" index="2" speed="27.78" length="3003.39" width="4.00" shape="3003.04,11.95 0.24,71.60"/>
+    </edge>
+
+    <junction id="eb_end" type="dead_end" x="3002.80" y="0.00" incLanes="highway_eb_0 highway_eb_1 highway_eb_2" intLanes="" shape="3002.68,-6.00 3002.92,6.00"/>
+    <junction id="eb_start" type="dead_end" x="0.00" y="59.65" incLanes="" intLanes="" shape="0.12,65.65 -0.12,53.65"/>
+    <junction id="wb_end" type="dead_end" x="0.32" y="75.60" incLanes="highway_wb_0 highway_wb_1 highway_wb_2" intLanes="" shape="0.44,81.60 0.20,69.60"/>
+    <junction id="wb_start" type="dead_end" x="3003.12" y="15.95" incLanes="" intLanes="" shape="3003.00,9.95 3003.24,21.95"/>
+
+</net>

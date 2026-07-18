@@ -1,0 +1,76 @@
+<!-- number of vehicles:60 -->
+<!-- Straight one-way highway scenario: 3 eastbound lanes, max speed 100 km/h. -->
+<routes>
+  <vType id="car100"
+         accel="2.6"
+         decel="4.5"
+         emergencyDecel="9.0"
+         sigma="0.5"
+         length="5.0"
+         minGap="2.5"
+         maxSpeed="27.78"
+         guiShape="passenger"/>
+
+  <route id="eastbound" edges="highway_eb"/>
+
+  <vehicle id="veh1" type="car100" route="eastbound" depart="0.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh2" type="car100" route="eastbound" depart="0.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh3" type="car100" route="eastbound" depart="1.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh4" type="car100" route="eastbound" depart="1.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh5" type="car100" route="eastbound" depart="2.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh6" type="car100" route="eastbound" depart="2.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh7" type="car100" route="eastbound" depart="3.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh8" type="car100" route="eastbound" depart="3.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh9" type="car100" route="eastbound" depart="4.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh10" type="car100" route="eastbound" depart="4.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh11" type="car100" route="eastbound" depart="5.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh12" type="car100" route="eastbound" depart="5.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh13" type="car100" route="eastbound" depart="6.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh14" type="car100" route="eastbound" depart="6.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh15" type="car100" route="eastbound" depart="7.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh16" type="car100" route="eastbound" depart="7.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh17" type="car100" route="eastbound" depart="8.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh18" type="car100" route="eastbound" depart="8.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh19" type="car100" route="eastbound" depart="9.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh20" type="car100" route="eastbound" depart="9.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh21" type="car100" route="eastbound" depart="10.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh22" type="car100" route="eastbound" depart="10.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh23" type="car100" route="eastbound" depart="11.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh24" type="car100" route="eastbound" depart="11.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh25" type="car100" route="eastbound" depart="12.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh26" type="car100" route="eastbound" depart="12.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh27" type="car100" route="eastbound" depart="13.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh28" type="car100" route="eastbound" depart="13.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh29" type="car100" route="eastbound" depart="14.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh30" type="car100" route="eastbound" depart="14.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh31" type="car100" route="eastbound" depart="15.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh32" type="car100" route="eastbound" depart="15.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh33" type="car100" route="eastbound" depart="16.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh34" type="car100" route="eastbound" depart="16.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh35" type="car100" route="eastbound" depart="17.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh36" type="car100" route="eastbound" depart="17.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh37" type="car100" route="eastbound" depart="18.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh38" type="car100" route="eastbound" depart="18.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh39" type="car100" route="eastbound" depart="19.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh40" type="car100" route="eastbound" depart="19.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh41" type="car100" route="eastbound" depart="20.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh42" type="car100" route="eastbound" depart="20.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh43" type="car100" route="eastbound" depart="21.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh44" type="car100" route="eastbound" depart="21.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh45" type="car100" route="eastbound" depart="22.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh46" type="car100" route="eastbound" depart="22.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh47" type="car100" route="eastbound" depart="23.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh48" type="car100" route="eastbound" depart="23.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh49" type="car100" route="eastbound" depart="24.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh50" type="car100" route="eastbound" depart="24.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh51" type="car100" route="eastbound" depart="25.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh52" type="car100" route="eastbound" depart="25.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh53" type="car100" route="eastbound" depart="26.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh54" type="car100" route="eastbound" depart="26.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh55" type="car100" route="eastbound" depart="27.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh56" type="car100" route="eastbound" depart="27.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh57" type="car100" route="eastbound" depart="28.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh58" type="car100" route="eastbound" depart="28.5" departLane="random" departSpeed="max"/>
+  <vehicle id="veh59" type="car100" route="eastbound" depart="29.0" departLane="random" departSpeed="max"/>
+  <vehicle id="veh60" type="car100" route="eastbound" depart="29.5" departLane="random" departSpeed="max"/>
+</routes>

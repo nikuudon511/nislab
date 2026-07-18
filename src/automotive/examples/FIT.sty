@@ -1,0 +1,63 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{FIT}[2026/06/23 FIT2026 paper style]
+
+\RequirePackage[top=30mm,bottom=25mm,left=20mm,right=20mm]{geometry}
+\RequirePackage[dvipdfmx]{graphicx}
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{booktabs}
+\RequirePackage{cite}
+\RequirePackage{url}
+\RequirePackage{times}
+\RequirePackage[T1]{fontenc}
+\RequirePackage{mathptmx}
+\RequirePackage{enumitem}
+
+\setlength{\columnsep}{7mm}
+\setlength{\parindent}{1zw}
+\setlength{\parskip}{0pt}
+\pagestyle{empty}
+\renewcommand{\baselinestretch}{0.96}
+\setlist{nosep,leftmargin=2zw}
+
+\makeatletter
+\newcommand{\fitmaketitle}[6]{%
+  \twocolumn[
+    \vspace*{-4mm}
+    \begin{center}
+      \rule{\textwidth}{0.4pt}\par
+      \vspace{2mm}
+      {\LARGE\bfseries #1\par}
+      \vspace{1.5mm}
+      {\Large #2\par}
+      \vspace{3mm}
+      {\large #3\par}
+      \vspace{0.5mm}
+      {#4\par}
+      \vspace{1.5mm}
+      \rule{\textwidth}{0.4pt}\par
+    \end{center}
+    \vspace{3mm}
+  ]%
+  \begingroup
+    \renewcommand{\thefootnote}{\fnsymbol{footnote}}%
+    \footnotetext[1]{#5\quad #6}%
+  \endgroup
+}
+\makeatother
+
+\makeatletter
+\renewcommand{\section}{%
+  \@startsection{section}{1}{\z@}%
+  {0.8\baselineskip}{0.25\baselineskip}%
+  {\normalfont\large\bfseries}}
+\renewcommand{\subsection}{%
+  \@startsection{subsection}{2}{\z@}%
+  {0.6\baselineskip}{0.15\baselineskip}%
+  {\normalfont\normalsize\bfseries}}
+\makeatother
+
+\renewcommand{\figurename}{図}
+\renewcommand{\tablename}{表}
+\newcommand{\figref}[1]{図~\ref{#1}}
+\newcommand{\tabref}[1]{表~\ref{#1}}

@@ -41,6 +41,18 @@ namespace ns3 {
     constexpr double RMR_EPSILON = 1e-6;
     std::unordered_map<uint64_t, std::set<uint64_t>> g_sharedRmrDeletedIdsByStation;
 
+    struct RmrDeletedFeatureStats
+    {
+      uint32_t count = 0;
+      double distanceSum = 0.0;
+      double frequencySum = 0.0;
+      double positionChangeSum = 0.0;
+      double speedChangeSum = 0.0;
+      double scoreSum = 0.0;
+    };
+
+    std::unordered_map<uint64_t, RmrDeletedFeatureStats> g_sharedRmrDeletedFeatureStatsByStation;
+
     struct RmrCandidate
     {
       uint64_t stationId;
@@ -119,11 +131,23 @@ namespace ns3 {
     m_last_rmr_candidate_count = 0;
     m_last_rmr_included_objects = 0;
     m_last_rmr_deleted_objects = 0;
+    m_last_rmr_deleted_feature_count = 0;
+    m_last_rmr_deleted_distance_sum = 0.0;
+    m_last_rmr_deleted_frequency_sum = 0.0;
+    m_last_rmr_deleted_position_change_sum = 0.0;
+    m_last_rmr_deleted_speed_change_sum = 0.0;
+    m_last_rmr_deleted_score_sum = 0.0;
     m_use_external_rmr_deleted_ids = false;
     m_last_cpm_size_bytes = 0;
     m_total_rmr_candidate_count = 0;
     m_total_rmr_included_objects = 0;
     m_total_rmr_deleted_objects = 0;
+    m_total_rmr_deleted_feature_count = 0;
+    m_total_rmr_deleted_distance_sum = 0.0;
+    m_total_rmr_deleted_frequency_sum = 0.0;
+    m_total_rmr_deleted_position_change_sum = 0.0;
+    m_total_rmr_deleted_speed_change_sum = 0.0;
+    m_total_rmr_deleted_score_sum = 0.0;
     m_total_cpm_size_bytes = 0;
 
     m_cpm_sent=0;
@@ -276,6 +300,12 @@ namespace ns3 {
   CPBasicService::selectCbrAdaptiveRmrDeletions(std::vector<LDM::returnedVehicleData_t>& LDM_POs)
   {
     std::set<uint64_t> deletedIds;
+    m_last_rmr_deleted_feature_count = 0;
+    m_last_rmr_deleted_distance_sum = 0.0;
+    m_last_rmr_deleted_frequency_sum = 0.0;
+    m_last_rmr_deleted_position_change_sum = 0.0;
+    m_last_rmr_deleted_speed_change_sum = 0.0;
+    m_last_rmr_deleted_score_sum = 0.0;
     const uint32_t deletionBudget = getRmrDeletionBudget ();
     const double actionProbability = std::max (0.0, std::min (1.0, m_rmr_action_probability));
     if (deletionBudget == 0 || actionProbability <= 0.0)
@@ -417,11 +447,23 @@ namespace ns3 {
             actionProbability)
           {
             deletedIds.insert (candidates[index].stationId);
+            ++m_last_rmr_deleted_feature_count;
+            m_last_rmr_deleted_distance_sum += candidates[index].distance;
+            m_last_rmr_deleted_frequency_sum += candidates[index].frequency;
+            m_last_rmr_deleted_position_change_sum += candidates[index].positionChange;
+            m_last_rmr_deleted_speed_change_sum += candidates[index].speedChange;
+            m_last_rmr_deleted_score_sum += candidates[index].score;
           }
       }
 
     m_last_rmr_deleted_objects = static_cast<uint32_t> (deletedIds.size ());
     m_total_rmr_deleted_objects += m_last_rmr_deleted_objects;
+    m_total_rmr_deleted_feature_count += m_last_rmr_deleted_feature_count;
+    m_total_rmr_deleted_distance_sum += m_last_rmr_deleted_distance_sum;
+    m_total_rmr_deleted_frequency_sum += m_last_rmr_deleted_frequency_sum;
+    m_total_rmr_deleted_position_change_sum += m_last_rmr_deleted_position_change_sum;
+    m_total_rmr_deleted_speed_change_sum += m_last_rmr_deleted_speed_change_sum;
+    m_total_rmr_deleted_score_sum += m_last_rmr_deleted_score_sum;
     return deletedIds;
   }
 
@@ -471,6 +513,12 @@ namespace ns3 {
             std::set<uint64_t> rmrDeletedIds;
             if (m_cbr_adaptive_rmr)
               {
+                m_last_rmr_deleted_feature_count = 0;
+                m_last_rmr_deleted_distance_sum = 0.0;
+                m_last_rmr_deleted_frequency_sum = 0.0;
+                m_last_rmr_deleted_position_change_sum = 0.0;
+                m_last_rmr_deleted_speed_change_sum = 0.0;
+                m_last_rmr_deleted_score_sum = 0.0;
                 if (m_use_external_rmr_deleted_ids)
                   {
                     rmrDeletedIds = m_external_rmr_deleted_ids;
@@ -483,6 +531,27 @@ namespace ns3 {
                     if (sharedIt != g_sharedRmrDeletedIdsByStation.end ())
                       {
                         rmrDeletedIds = sharedIt->second;
+                        const auto featureIt =
+                            g_sharedRmrDeletedFeatureStatsByStation.find (m_station_id);
+                        if (featureIt != g_sharedRmrDeletedFeatureStatsByStation.end ())
+                          {
+                            m_last_rmr_deleted_feature_count = featureIt->second.count;
+                            m_last_rmr_deleted_distance_sum = featureIt->second.distanceSum;
+                            m_last_rmr_deleted_frequency_sum = featureIt->second.frequencySum;
+                            m_last_rmr_deleted_position_change_sum =
+                                featureIt->second.positionChangeSum;
+                            m_last_rmr_deleted_speed_change_sum = featureIt->second.speedChangeSum;
+                            m_last_rmr_deleted_score_sum = featureIt->second.scoreSum;
+                            m_total_rmr_deleted_feature_count +=
+                                m_last_rmr_deleted_feature_count;
+                            m_total_rmr_deleted_distance_sum += m_last_rmr_deleted_distance_sum;
+                            m_total_rmr_deleted_frequency_sum += m_last_rmr_deleted_frequency_sum;
+                            m_total_rmr_deleted_position_change_sum +=
+                                m_last_rmr_deleted_position_change_sum;
+                            m_total_rmr_deleted_speed_change_sum +=
+                                m_last_rmr_deleted_speed_change_sum;
+                            m_total_rmr_deleted_score_sum += m_last_rmr_deleted_score_sum;
+                          }
                       }
                     else
                       {
@@ -497,6 +566,14 @@ namespace ns3 {
                     if (m_rmr_forwarding_mode == RMR_FORWARDING_PRIMARY)
                       {
                         g_sharedRmrDeletedIdsByStation[m_station_id] = rmrDeletedIds;
+                        g_sharedRmrDeletedFeatureStatsByStation[m_station_id] =
+                            RmrDeletedFeatureStats {
+                                m_last_rmr_deleted_feature_count,
+                                m_last_rmr_deleted_distance_sum,
+                                m_last_rmr_deleted_frequency_sum,
+                                m_last_rmr_deleted_position_change_sum,
+                                m_last_rmr_deleted_speed_change_sum,
+                                m_last_rmr_deleted_score_sum};
                       }
                   }
                 m_last_rmr_deleted_ids = rmrDeletedIds;

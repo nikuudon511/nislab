@@ -1,0 +1,8 @@
+scale,mode,source,time_s,active,complete_run,nr_routes,mec_routes,dual_routes,nr_tx,mec_ul_packets,mec_dl_packets,aoi_p99_ms,capacity_delay_p99_ms,ul_final_losses,dl_final_losses,orr_percent,summary_mec_tx,summary_mec_rx,summary_mec_p99_ms,note
+50,V2N2V-only,summary+observation,9,50,true,0,50,0,0,4450,101746,225,191,17,488,100,4950,110083,223,completed 10s run
+50,Hybrid forced,summary+observation,9,50,true,50,50,50,2551,3950,58402,198,172,24,275,82.9166,4450,64366,197,completed 10s run; adaptive threshold forced for comparison
+100,V2N2V-only,observation,2,100,false,0,100,0,0,1900,68826,839,1267,6,330,N/A,N/A,N/A,N/A,early-stopped due runtime; preliminary t=2 observation
+100,Hybrid forced,observation,2,100,false,100,64,64,1588,576,12420,201,178,4,64,16.3096,N/A,N/A,N/A,early-stopped due runtime; preliminary t=2 observation
+100,V2N2V-only escalated,observation,2,100,false,0,100,0,0,1900,68826,839,1267,6,330,N/A,N/A,N/A,N/A,sandbox-outside rerun; stopped after t=2 due runtime
+100,Adaptive normal escalated,observation,2,100,false,100,0,0,1673,0,0,0,0,0,0,N/A,N/A,N/A,N/A,sandbox-outside rerun; normal threshold did not activate MEC by t=2
+100,Hybrid forced escalated,observation,2,100,false,100,64,64,1673,576,16862,206,182,4,82,N/A,N/A,N/A,N/A,sandbox-outside rerun; stopped after t=2 due runtime

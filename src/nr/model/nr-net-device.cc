@@ -213,7 +213,9 @@ NrNetDevice::Receive (Ptr<Packet> p)
     }
   else
     {
-      NS_ABORT_MSG ("NrNetDevice::Receive - Unknown IP type...");
+      NS_LOG_WARN ("NrNetDevice::Receive - dropping packet with unknown IP type, size="
+                   << p->GetSize ());
+      return;
     }
 }
 
@@ -225,5 +227,4 @@ NrNetDevice::Send (Ptr<Packet> packet, const Address& dest, uint16_t protocolNum
 }
 
 }
-
 

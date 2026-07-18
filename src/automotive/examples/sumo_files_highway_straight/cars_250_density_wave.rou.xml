@@ -1,0 +1,257 @@
+<routes>
+  <vType id="cavDedicated80" accel="2.6" decel="4.5" sigma="0" length="5" minGap="2.5" maxSpeed="22.22" color="0,80,255"/>
+  <vType id="cavGeneral90" accel="2.6" decel="4.5" sigma="0.3" length="5" minGap="2.5" maxSpeed="25.00" color="0,140,255"/>
+  <vType id="noncav100" accel="2.0" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="27.78" color="150,150,150"/>
+  <route id="eastbound" edges="highway_eb"/>
+  <route id="westbound" edges="highway_wb"/>
+  <vehicle id="veh1" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="220.0" departSpeed="0"/>
+  <vehicle id="veh2" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="220.0" departSpeed="0"/>
+  <vehicle id="veh3" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="236.0" departSpeed="0"/>
+  <vehicle id="veh4" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="220.0" departSpeed="0"/>
+  <vehicle id="veh5" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="252.0" departSpeed="0"/>
+  <vehicle id="veh6" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="193.0" departSpeed="0"/>
+  <vehicle id="veh7" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="193.0" departSpeed="0"/>
+  <vehicle id="veh8" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="205.0" departSpeed="0"/>
+  <vehicle id="veh9" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="193.0" departSpeed="0"/>
+  <vehicle id="veh10" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="217.0" departSpeed="0"/>
+  <vehicle id="veh11" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="307.0" departSpeed="0"/>
+  <vehicle id="veh12" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="307.0" departSpeed="0"/>
+  <vehicle id="veh13" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="320.0" departSpeed="0"/>
+  <vehicle id="veh14" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="307.0" departSpeed="0"/>
+  <vehicle id="veh15" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="333.0" departSpeed="0"/>
+  <vehicle id="veh16" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="273.0" departSpeed="0"/>
+  <vehicle id="veh17" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="273.0" departSpeed="0"/>
+  <vehicle id="veh18" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="283.0" departSpeed="0"/>
+  <vehicle id="veh19" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="273.0" departSpeed="0"/>
+  <vehicle id="veh20" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="293.0" departSpeed="0"/>
+  <vehicle id="veh21" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="396.0" departSpeed="0"/>
+  <vehicle id="veh22" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="396.0" departSpeed="0"/>
+  <vehicle id="veh23" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="406.0" departSpeed="0"/>
+  <vehicle id="veh24" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="396.0" departSpeed="0"/>
+  <vehicle id="veh25" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="416.0" departSpeed="0"/>
+  <vehicle id="veh26" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="353.0" departSpeed="0"/>
+  <vehicle id="veh27" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="353.0" departSpeed="0"/>
+  <vehicle id="veh28" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="364.0" departSpeed="0"/>
+  <vehicle id="veh29" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="353.0" departSpeed="0"/>
+  <vehicle id="veh30" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="375.0" departSpeed="0"/>
+  <vehicle id="veh31" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="449.0" departSpeed="0"/>
+  <vehicle id="veh32" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="449.0" departSpeed="0"/>
+  <vehicle id="veh33" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="465.0" departSpeed="0"/>
+  <vehicle id="veh34" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="449.0" departSpeed="0"/>
+  <vehicle id="veh35" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="481.0" departSpeed="0"/>
+  <vehicle id="veh36" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="439.0" departSpeed="0"/>
+  <vehicle id="veh37" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="439.0" departSpeed="0"/>
+  <vehicle id="veh38" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="453.0" departSpeed="0"/>
+  <vehicle id="veh39" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="439.0" departSpeed="0"/>
+  <vehicle id="veh40" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="467.0" departSpeed="0"/>
+  <vehicle id="veh41" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="528.0" departSpeed="0"/>
+  <vehicle id="veh42" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="528.0" departSpeed="0"/>
+  <vehicle id="veh43" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="540.0" departSpeed="0"/>
+  <vehicle id="veh44" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="528.0" departSpeed="0"/>
+  <vehicle id="veh45" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="552.0" departSpeed="0"/>
+  <vehicle id="veh46" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="530.0" departSpeed="0"/>
+  <vehicle id="veh47" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="530.0" departSpeed="0"/>
+  <vehicle id="veh48" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="547.0" departSpeed="0"/>
+  <vehicle id="veh49" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="530.0" departSpeed="0"/>
+  <vehicle id="veh50" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="564.0" departSpeed="0"/>
+  <vehicle id="veh51" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="609.0" departSpeed="0"/>
+  <vehicle id="veh52" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="609.0" departSpeed="0"/>
+  <vehicle id="veh53" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="623.0" departSpeed="0"/>
+  <vehicle id="veh54" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="609.0" departSpeed="0"/>
+  <vehicle id="veh55" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="637.0" departSpeed="0"/>
+  <vehicle id="veh56" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="622.0" departSpeed="0"/>
+  <vehicle id="veh57" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="622.0" departSpeed="0"/>
+  <vehicle id="veh58" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="634.0" departSpeed="0"/>
+  <vehicle id="veh59" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="622.0" departSpeed="0"/>
+  <vehicle id="veh60" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="646.0" departSpeed="0"/>
+  <vehicle id="veh61" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="694.0" departSpeed="0"/>
+  <vehicle id="veh62" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="694.0" departSpeed="0"/>
+  <vehicle id="veh63" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="707.0" departSpeed="0"/>
+  <vehicle id="veh64" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="694.0" departSpeed="0"/>
+  <vehicle id="veh65" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="720.0" departSpeed="0"/>
+  <vehicle id="veh66" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="703.0" departSpeed="0"/>
+  <vehicle id="veh67" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="703.0" departSpeed="0"/>
+  <vehicle id="veh68" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="716.0" departSpeed="0"/>
+  <vehicle id="veh69" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="703.0" departSpeed="0"/>
+  <vehicle id="veh70" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="729.0" departSpeed="0"/>
+  <vehicle id="veh71" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="758.0" departSpeed="0"/>
+  <vehicle id="veh72" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="758.0" departSpeed="0"/>
+  <vehicle id="veh73" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="769.0" departSpeed="0"/>
+  <vehicle id="veh74" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="758.0" departSpeed="0"/>
+  <vehicle id="veh75" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="780.0" departSpeed="0"/>
+  <vehicle id="veh76" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="790.0" departSpeed="0"/>
+  <vehicle id="veh77" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="790.0" departSpeed="0"/>
+  <vehicle id="veh78" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="806.0" departSpeed="0"/>
+  <vehicle id="veh79" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="790.0" departSpeed="0"/>
+  <vehicle id="veh80" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="822.0" departSpeed="0"/>
+  <vehicle id="veh81" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="837.0" departSpeed="0"/>
+  <vehicle id="veh82" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="837.0" departSpeed="0"/>
+  <vehicle id="veh83" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="851.0" departSpeed="0"/>
+  <vehicle id="veh84" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="837.0" departSpeed="0"/>
+  <vehicle id="veh85" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="865.0" departSpeed="0"/>
+  <vehicle id="veh86" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="862.0" departSpeed="0"/>
+  <vehicle id="veh87" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="862.0" departSpeed="0"/>
+  <vehicle id="veh88" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="879.0" departSpeed="0"/>
+  <vehicle id="veh89" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="862.0" departSpeed="0"/>
+  <vehicle id="veh90" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="896.0" departSpeed="0"/>
+  <vehicle id="veh91" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="926.0" departSpeed="0"/>
+  <vehicle id="veh92" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="926.0" departSpeed="0"/>
+  <vehicle id="veh93" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="936.0" departSpeed="0"/>
+  <vehicle id="veh94" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="926.0" departSpeed="0"/>
+  <vehicle id="veh95" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="946.0" departSpeed="0"/>
+  <vehicle id="veh96" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="964.0" departSpeed="0"/>
+  <vehicle id="veh97" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="964.0" departSpeed="0"/>
+  <vehicle id="veh98" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="974.0" departSpeed="0"/>
+  <vehicle id="veh99" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="964.0" departSpeed="0"/>
+  <vehicle id="veh100" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="984.0" departSpeed="0"/>
+  <vehicle id="veh101" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="986.0" departSpeed="0"/>
+  <vehicle id="veh102" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="986.0" departSpeed="0"/>
+  <vehicle id="veh103" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1003.0" departSpeed="0"/>
+  <vehicle id="veh104" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="986.0" departSpeed="0"/>
+  <vehicle id="veh105" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1020.0" departSpeed="0"/>
+  <vehicle id="veh106" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="1045.0" departSpeed="0"/>
+  <vehicle id="veh107" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="1045.0" departSpeed="0"/>
+  <vehicle id="veh108" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1060.0" departSpeed="0"/>
+  <vehicle id="veh109" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="1045.0" departSpeed="0"/>
+  <vehicle id="veh110" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1075.0" departSpeed="0"/>
+  <vehicle id="veh111" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="1060.0" departSpeed="0"/>
+  <vehicle id="veh112" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="1060.0" departSpeed="0"/>
+  <vehicle id="veh113" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1073.0" departSpeed="0"/>
+  <vehicle id="veh114" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="1060.0" departSpeed="0"/>
+  <vehicle id="veh115" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1086.0" departSpeed="0"/>
+  <vehicle id="veh116" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="1115.0" departSpeed="0"/>
+  <vehicle id="veh117" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="1115.0" departSpeed="0"/>
+  <vehicle id="veh118" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1130.0" departSpeed="0"/>
+  <vehicle id="veh119" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="1115.0" departSpeed="0"/>
+  <vehicle id="veh120" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1145.0" departSpeed="0"/>
+  <vehicle id="veh121" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="1147.0" departSpeed="0"/>
+  <vehicle id="veh122" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="1147.0" departSpeed="0"/>
+  <vehicle id="veh123" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1159.0" departSpeed="0"/>
+  <vehicle id="veh124" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="1147.0" departSpeed="0"/>
+  <vehicle id="veh125" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1171.0" departSpeed="0"/>
+  <vehicle id="veh126" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="1193.0" departSpeed="0"/>
+  <vehicle id="veh127" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="1193.0" departSpeed="0"/>
+  <vehicle id="veh128" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1208.0" departSpeed="0"/>
+  <vehicle id="veh129" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="1193.0" departSpeed="0"/>
+  <vehicle id="veh130" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1223.0" departSpeed="0"/>
+  <vehicle id="veh131" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="1220.0" departSpeed="0"/>
+  <vehicle id="veh132" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="1220.0" departSpeed="0"/>
+  <vehicle id="veh133" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1231.0" departSpeed="0"/>
+  <vehicle id="veh134" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="1220.0" departSpeed="0"/>
+  <vehicle id="veh135" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1242.0" departSpeed="0"/>
+  <vehicle id="veh136" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="1291.0" departSpeed="0"/>
+  <vehicle id="veh137" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="1291.0" departSpeed="0"/>
+  <vehicle id="veh138" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1303.0" departSpeed="0"/>
+  <vehicle id="veh139" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="1291.0" departSpeed="0"/>
+  <vehicle id="veh140" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1315.0" departSpeed="0"/>
+  <vehicle id="veh141" type="cavDedicated80" route="westbound" depart="0.0" departLane="0" departPos="1272.0" departSpeed="0"/>
+  <vehicle id="veh142" type="cavGeneral90" route="westbound" depart="0.0" departLane="1" departPos="1272.0" departSpeed="0"/>
+  <vehicle id="veh143" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1283.0" departSpeed="0"/>
+  <vehicle id="veh144" type="noncav100" route="westbound" depart="0.0" departLane="2" departPos="1272.0" departSpeed="0"/>
+  <vehicle id="veh145" type="noncav100" route="westbound" depart="0.0" departLane="1" departPos="1294.0" departSpeed="0"/>
+  <vehicle id="veh146" type="cavDedicated80" route="eastbound" depart="0.0" departLane="0" departPos="1348.0" departSpeed="0"/>
+  <vehicle id="veh147" type="cavGeneral90" route="eastbound" depart="0.0" departLane="2" departPos="1348.0" departSpeed="0"/>
+  <vehicle id="veh148" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1363.0" departSpeed="0"/>
+  <vehicle id="veh149" type="noncav100" route="eastbound" depart="0.0" departLane="1" departPos="1348.0" departSpeed="0"/>
+  <vehicle id="veh150" type="noncav100" route="eastbound" depart="0.0" departLane="2" departPos="1378.0" departSpeed="0"/>
+  <vehicle id="veh151" type="cavDedicated80" route="westbound" depart="10.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh152" type="cavGeneral90" route="westbound" depart="10.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh154" type="noncav100" route="westbound" depart="10.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh153" type="noncav100" route="westbound" depart="10.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh156" type="cavDedicated80" route="eastbound" depart="11.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh157" type="cavGeneral90" route="eastbound" depart="11.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh159" type="noncav100" route="eastbound" depart="11.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh155" type="noncav100" route="westbound" depart="11.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh158" type="noncav100" route="eastbound" depart="12.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh161" type="cavDedicated80" route="westbound" depart="13.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh162" type="cavGeneral90" route="westbound" depart="13.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh164" type="noncav100" route="westbound" depart="13.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh160" type="noncav100" route="eastbound" depart="13.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh163" type="noncav100" route="westbound" depart="13.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh166" type="cavDedicated80" route="eastbound" depart="14.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh167" type="cavGeneral90" route="eastbound" depart="14.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh169" type="noncav100" route="eastbound" depart="14.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh165" type="noncav100" route="westbound" depart="14.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh168" type="noncav100" route="eastbound" depart="15.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh171" type="cavDedicated80" route="westbound" depart="16.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh172" type="cavGeneral90" route="westbound" depart="16.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh174" type="noncav100" route="westbound" depart="16.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh170" type="noncav100" route="eastbound" depart="16.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh173" type="noncav100" route="westbound" depart="16.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh176" type="cavDedicated80" route="eastbound" depart="17.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh177" type="cavGeneral90" route="eastbound" depart="17.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh179" type="noncav100" route="eastbound" depart="17.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh175" type="noncav100" route="westbound" depart="17.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh178" type="noncav100" route="eastbound" depart="18.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh181" type="cavDedicated80" route="westbound" depart="19.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh182" type="cavGeneral90" route="westbound" depart="19.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh184" type="noncav100" route="westbound" depart="19.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh180" type="noncav100" route="eastbound" depart="19.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh183" type="noncav100" route="westbound" depart="19.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh186" type="cavDedicated80" route="eastbound" depart="20.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh187" type="cavGeneral90" route="eastbound" depart="20.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh189" type="noncav100" route="eastbound" depart="20.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh185" type="noncav100" route="westbound" depart="20.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh188" type="noncav100" route="eastbound" depart="21.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh191" type="cavDedicated80" route="westbound" depart="22.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh192" type="cavGeneral90" route="westbound" depart="22.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh194" type="noncav100" route="westbound" depart="22.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh190" type="noncav100" route="eastbound" depart="22.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh193" type="noncav100" route="westbound" depart="22.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh196" type="cavDedicated80" route="eastbound" depart="23.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh197" type="cavGeneral90" route="eastbound" depart="23.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh199" type="noncav100" route="eastbound" depart="23.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh195" type="noncav100" route="westbound" depart="23.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh198" type="noncav100" route="eastbound" depart="24.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh201" type="cavDedicated80" route="westbound" depart="25.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh202" type="cavGeneral90" route="westbound" depart="25.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh204" type="noncav100" route="westbound" depart="25.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh200" type="noncav100" route="eastbound" depart="25.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh203" type="noncav100" route="westbound" depart="25.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh206" type="cavDedicated80" route="eastbound" depart="26.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh207" type="cavGeneral90" route="eastbound" depart="26.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh209" type="noncav100" route="eastbound" depart="26.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh205" type="noncav100" route="westbound" depart="26.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh208" type="noncav100" route="eastbound" depart="27.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh211" type="cavDedicated80" route="westbound" depart="28.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh212" type="cavGeneral90" route="westbound" depart="28.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh214" type="noncav100" route="westbound" depart="28.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh210" type="noncav100" route="eastbound" depart="28.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh213" type="noncav100" route="westbound" depart="28.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh216" type="cavDedicated80" route="eastbound" depart="29.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh217" type="cavGeneral90" route="eastbound" depart="29.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh219" type="noncav100" route="eastbound" depart="29.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh215" type="noncav100" route="westbound" depart="29.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh218" type="noncav100" route="eastbound" depart="30.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh221" type="cavDedicated80" route="westbound" depart="31.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh222" type="cavGeneral90" route="westbound" depart="31.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh224" type="noncav100" route="westbound" depart="31.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh220" type="noncav100" route="eastbound" depart="31.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh223" type="noncav100" route="westbound" depart="31.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh226" type="cavDedicated80" route="eastbound" depart="32.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh227" type="cavGeneral90" route="eastbound" depart="32.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh229" type="noncav100" route="eastbound" depart="32.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh225" type="noncav100" route="westbound" depart="32.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh228" type="noncav100" route="eastbound" depart="33.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh231" type="cavDedicated80" route="westbound" depart="34.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh232" type="cavGeneral90" route="westbound" depart="34.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh234" type="noncav100" route="westbound" depart="34.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh230" type="noncav100" route="eastbound" depart="34.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh233" type="noncav100" route="westbound" depart="34.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh236" type="cavDedicated80" route="eastbound" depart="35.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh237" type="cavGeneral90" route="eastbound" depart="35.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh239" type="noncav100" route="eastbound" depart="35.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh235" type="noncav100" route="westbound" depart="35.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh238" type="noncav100" route="eastbound" depart="36.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh241" type="cavDedicated80" route="westbound" depart="37.0" departLane="0" departSpeed="max"/>
+  <vehicle id="veh242" type="cavGeneral90" route="westbound" depart="37.0" departLane="1" departSpeed="max"/>
+  <vehicle id="veh244" type="noncav100" route="westbound" depart="37.0" departLane="2" departSpeed="max"/>
+  <vehicle id="veh240" type="noncav100" route="eastbound" depart="37.1" departLane="2" departSpeed="max"/>
+  <vehicle id="veh243" type="noncav100" route="westbound" depart="37.8" departLane="1" departSpeed="max"/>
+  <vehicle id="veh246" type="cavDedicated80" route="eastbound" depart="38.5" departLane="0" departSpeed="max"/>
+  <vehicle id="veh247" type="cavGeneral90" route="eastbound" depart="38.5" departLane="2" departSpeed="max"/>
+  <vehicle id="veh249" type="noncav100" route="eastbound" depart="38.5" departLane="1" departSpeed="max"/>
+  <vehicle id="veh245" type="noncav100" route="westbound" depart="38.6" departLane="1" departSpeed="max"/>
+  <vehicle id="veh248" type="noncav100" route="eastbound" depart="39.3" departLane="2" departSpeed="max"/>
+  <vehicle id="veh250" type="noncav100" route="eastbound" depart="40.1" departLane="2" departSpeed="max"/>
+</routes>

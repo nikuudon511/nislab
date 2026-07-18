@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edges>
+  <edge id="loop_0" from="n0" to="n1" priority="3" numLanes="3" speed="27.78"/>
+  <edge id="loop_1" from="n1" to="n2" priority="3" numLanes="3" speed="27.78"/>
+  <edge id="loop_2" from="n2" to="n3" priority="3" numLanes="3" speed="27.78"/>
+  <edge id="loop_3" from="n3" to="n0" priority="3" numLanes="3" speed="27.78"/>
+  <edge id="loop_r0" from="n1" to="n0" priority="3" numLanes="3" speed="27.78"/>
+  <edge id="loop_r1" from="n2" to="n1" priority="3" numLanes="3" speed="27.78"/>
+  <edge id="loop_r2" from="n3" to="n2" priority="3" numLanes="3" speed="27.78"/>
+  <edge id="loop_r3" from="n0" to="n3" priority="3" numLanes="3" speed="27.78"/>
+</edges>

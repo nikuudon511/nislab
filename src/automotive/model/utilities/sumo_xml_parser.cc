@@ -45,6 +45,21 @@ namespace ns3
       num_vehicles = xpathObj->nodesetval->nodeNr;
 
       xmlXPathFreeObject(xpathObj);
+
+      xpathObj = xmlXPathEvalExpression((xmlChar *)"//flow",xpathCtx);
+      if(xpathObj != NULL && xpathObj->nodesetval != NULL) {
+          for(int i=0; i<xpathObj->nodesetval->nodeNr; ++i) {
+              xmlNodePtr flow = xpathObj->nodesetval->nodeTab[i];
+              xmlChar *number = xmlGetProp(flow, (const xmlChar *)"number");
+              if(number != NULL) {
+                  num_vehicles += std::stoi(reinterpret_cast<const char *>(number));
+                  xmlFree(number);
+              }
+          }
+      }
+      if(xpathObj != NULL) {
+          xmlXPathFreeObject(xpathObj);
+      }
       xmlXPathFreeContext(xpathCtx);
 
       return num_vehicles;

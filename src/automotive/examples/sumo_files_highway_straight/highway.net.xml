@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-06-20T00:02:22.027962+09:00 by Eclipse SUMO netconvert 1.26.0
+<netconvertConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
+
+    <input>
+        <node-files value="src/automotive/examples/sumo_files_highway_straight/highway.nod.xml"/>
+        <edge-files value="src/automotive/examples/sumo_files_highway_straight/highway.edg.xml"/>
+    </input>
+
+    <output>
+        <output-file value="src/automotive/examples/sumo_files_highway_straight/highway.net.xml"/>
+    </output>
+
+</netconvertConfiguration>
+-->
+
+<net version="1.20" junctionCornerDetail="5" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
+
+    <location netOffset="0.00,8.00" convBoundary="0.00,0.00,3000.00,16.00" origBoundary="0.00,-8.00,3000.00,8.00" projParameter="!"/>
+
+    <edge id="highway_eb" from="eb_start" to="eb_end" priority="3" spreadType="center">
+        <lane id="highway_eb_0" index="0" speed="27.78" length="3000.00" width="4.00" shape="0.00,-4.00 3000.00,-4.00"/>
+        <lane id="highway_eb_1" index="1" speed="27.78" length="3000.00" width="4.00" shape="0.00,0.00 3000.00,0.00"/>
+        <lane id="highway_eb_2" index="2" speed="27.78" length="3000.00" width="4.00" shape="0.00,4.00 3000.00,4.00"/>
+    </edge>
+    <edge id="highway_wb" from="wb_start" to="wb_end" priority="3" spreadType="center">
+        <lane id="highway_wb_0" index="0" speed="27.78" length="3000.00" width="4.00" shape="3000.00,20.00 0.00,20.00"/>
+        <lane id="highway_wb_1" index="1" speed="27.78" length="3000.00" width="4.00" shape="3000.00,16.00 0.00,16.00"/>
+        <lane id="highway_wb_2" index="2" speed="27.78" length="3000.00" width="4.00" shape="3000.00,12.00 0.00,12.00"/>
+    </edge>
+
+    <junction id="eb_end" type="dead_end" x="3000.00" y="0.00" incLanes="highway_eb_0 highway_eb_1 highway_eb_2" intLanes="" shape="3000.00,-6.00 3000.00,6.00"/>
+    <junction id="eb_start" type="dead_end" x="0.00" y="0.00" incLanes="" intLanes="" shape="0.00,6.00 0.00,-6.00"/>
+    <junction id="wb_end" type="dead_end" x="0.00" y="16.00" incLanes="highway_wb_0 highway_wb_1 highway_wb_2" intLanes="" shape="0.00,22.00 0.00,10.00"/>
+    <junction id="wb_start" type="dead_end" x="3000.00" y="16.00" incLanes="" intLanes="" shape="3000.00,10.00 3000.00,22.00"/>
+
+</net>
