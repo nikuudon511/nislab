@@ -36,6 +36,7 @@
 #include <bitset>
 #include <cmath>
 #include <cstdlib>
+#include <deque>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -153,6 +154,19 @@ struct ThesisEvaluationStats
   double receiverFreshRedundancyHigh200Sum = 0.0;
   double receiverFreshRedundancyLow200Sum = 0.0;
   double receiverRv200Sum = 0.0;
+  double receiverRlSum = 0.0;
+  double receiverRlMedianSum = 0.0;
+  double receiverRvDeloozSum = 0.0;
+  double receiverRvDeloozMedianSum = 0.0;
+  double receiverHighRlSum = 0.0;
+  double receiverLowRlSum = 0.0;
+  uint64_t receiverRlSamples = 0;
+  uint64_t receiverRlVehicleSamples = 0;
+  uint64_t receiverHighRlSamples = 0;
+  uint64_t receiverLowRlSamples = 0;
+  uint64_t receiverRlLt1 = 0;
+  uint64_t receiverRlGe1 = 0;
+  uint64_t receiverRlGe2 = 0;
   uint64_t receiverFreshRedundancySamples = 0;
   uint64_t receiverFreshRedundancyHighSamples = 0;
   uint64_t receiverFreshRedundancyLowSamples = 0;
@@ -306,7 +320,9 @@ struct MovingBackgroundConfig
 struct PriorityMotionState
 {
   Vector position;
+  Vector velocity;
   Time timestamp = Seconds (0.0);
+  bool hasVelocity = false;
 };
 
 struct PredictiveRmrConfig
@@ -382,6 +398,8 @@ static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
     g_latestMecCpmGenerationTimeByReceiver;
 static std::unordered_map<uint64_t, std::unordered_map<uint64_t, Time>>
     g_latestActualCpmObjectRxByReceiver;
+static std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::deque<Time>>>
+    g_cpmObjectUpdateHistoryByReceiver;
 static uint64_t g_interferenceTx = 0;
 static uint64_t g_interferenceBytes = 0;
 static uint64_t g_interferenceDrops = 0;
@@ -659,6 +677,9 @@ MarkCpmObjectsRecognizedByReceiver (uint64_t receiverStationId,
                                     Time now);
 
 static void
+RecordCpmObjectUpdate (uint64_t receiverStationId, uint64_t objectStationId, Time now);
+
+static void
 ReceiveCPM (asn1cpp::Seq<CollectivePerceptionMessage> cpm,
             Address from,
             StationID_t myStationId,
@@ -741,6 +762,9 @@ ReceiveCPM (asn1cpp::Seq<CollectivePerceptionMessage> cpm,
                                                    [static_cast<uint64_t> (objectId)] = now;
                       g_latestActualCpmObjectRxByReceiver[receiverStationId]
                                                           [static_cast<uint64_t> (objectId)] = now;
+                      RecordCpmObjectUpdate (receiverStationId,
+                                             static_cast<uint64_t> (objectId),
+                                             now);
                       (*routeUpdates)[receiverStationId][static_cast<uint64_t> (objectId)] = now;
                       if (route == ActiveRoute::NrSidelinkV2v)
                         {
@@ -830,6 +854,46 @@ VehicleIdToStationId (const std::string& vehicleId)
       return static_cast<uint64_t> (std::stoul (vehicleId.substr (4)) + 1);
     }
   return static_cast<uint64_t> (std::stoul (vehicleId.substr (3)));
+}
+
+static void
+RecordCpmObjectUpdate (uint64_t receiverStationId, uint64_t objectStationId, Time now)
+{
+  auto& history = g_cpmObjectUpdateHistoryByReceiver[receiverStationId][objectStationId];
+  history.push_back (now);
+  const Time window = Seconds (1.0);
+  while (!history.empty () && now - history.front () > window)
+    {
+      history.pop_front ();
+    }
+}
+
+static uint32_t
+CountRecentCpmObjectUpdates (uint64_t receiverStationId, uint64_t objectStationId, Time now)
+{
+  auto receiverIt = g_cpmObjectUpdateHistoryByReceiver.find (receiverStationId);
+  if (receiverIt == g_cpmObjectUpdateHistoryByReceiver.end ())
+    {
+      return 0;
+    }
+  auto objectIt = receiverIt->second.find (objectStationId);
+  if (objectIt == receiverIt->second.end ())
+    {
+      return 0;
+    }
+  auto& history = objectIt->second;
+  const Time window = Seconds (1.0);
+  while (!history.empty () && now - history.front () > window)
+    {
+      history.pop_front ();
+    }
+  return static_cast<uint32_t> (history.size ());
+}
+
+static double
+ComputeDeloozRv (double rl)
+{
+  return std::exp (-7.0 * std::exp (-2.31337 * std::max (0.0, rl)));
 }
 
 static void
@@ -2103,6 +2167,7 @@ AccumulateThesisRecognitionSample ()
 
   std::unordered_map<uint64_t, Ptr<MobilityModel>> activeStationMobility;
   std::unordered_map<uint64_t, Vector> activeStationPositions;
+  std::unordered_map<uint64_t, Vector> activeStationVelocities;
   for (const auto& entry : g_allVehicleNodes)
     {
       Ptr<MobilityModel> mobility =
@@ -2110,8 +2175,20 @@ AccumulateThesisRecognitionSample ()
       if (mobility != nullptr)
         {
           const uint64_t stationId = VehicleIdToStationId (entry.first);
+          const Vector position = mobility->GetPosition ();
           activeStationMobility[stationId] = mobility;
-          activeStationPositions[stationId] = mobility->GetPosition ();
+          activeStationPositions[stationId] = position;
+          const auto previousIt = g_priorityMotionHistory.find (stationId);
+          if (previousIt != g_priorityMotionHistory.end ())
+            {
+              const double dt = (Simulator::Now () - previousIt->second.timestamp).GetSeconds ();
+              if (dt > 0.0)
+                {
+                  const Vector delta = position - previousIt->second.position;
+                  activeStationVelocities[stationId] =
+                      Vector (delta.x / dt, delta.y / dt, delta.z / dt);
+                }
+            }
         }
     }
   const Time now = Simulator::Now ();
@@ -2248,6 +2325,8 @@ AccumulateThesisRecognitionSample ()
       };
       std::unordered_map<uint64_t, uint32_t> freshRedundancy200ByStation;
       std::unordered_map<uint64_t, uint32_t> freshRedundancy500ByStation;
+      std::vector<double> receiverRlValues;
+      std::vector<double> receiverRvValues;
       for (const uint64_t stationId : expectedStationIds)
         {
           const uint32_t fresh200 =
@@ -2261,6 +2340,63 @@ AccumulateThesisRecognitionSample ()
           g_thesisStats.receiverFreshRedundancy500Sum += fresh500;
           g_thesisStats.receiverRv200Sum += std::min (1.0, static_cast<double> (fresh200) / 2.0);
           ++g_thesisStats.receiverFreshRedundancySamples;
+
+          uint32_t receivedUpdates =
+              CountRecentCpmObjectUpdates (selfStationId, stationId, now);
+          if (sensorRecognizedStationIds.count (stationId) > 0)
+            {
+              ++receivedUpdates;
+            }
+          double distanceChangeMeters = 0.0;
+          double speedChangeMps = 0.0;
+          const auto currentPositionIt = activeStationPositions.find (stationId);
+          const auto previousStateIt = g_priorityMotionHistory.find (stationId);
+          if (currentPositionIt != activeStationPositions.end () &&
+              previousStateIt != g_priorityMotionHistory.end ())
+            {
+              const Vector delta = currentPositionIt->second - previousStateIt->second.position;
+              distanceChangeMeters =
+                  std::sqrt ((delta.x * delta.x) + (delta.y * delta.y) + (delta.z * delta.z));
+              const auto currentVelocityIt = activeStationVelocities.find (stationId);
+              if (currentVelocityIt != activeStationVelocities.end () &&
+                  previousStateIt->second.hasVelocity)
+                {
+                  const double currentSpeed =
+                      std::sqrt ((currentVelocityIt->second.x * currentVelocityIt->second.x) +
+                                 (currentVelocityIt->second.y * currentVelocityIt->second.y) +
+                                 (currentVelocityIt->second.z * currentVelocityIt->second.z));
+                  const double previousSpeed =
+                      std::sqrt ((previousStateIt->second.velocity.x *
+                                  previousStateIt->second.velocity.x) +
+                                 (previousStateIt->second.velocity.y *
+                                  previousStateIt->second.velocity.y) +
+                                 (previousStateIt->second.velocity.z *
+                                  previousStateIt->second.velocity.z));
+                  speedChangeMps = std::abs (currentSpeed - previousSpeed);
+                }
+            }
+          const uint32_t requiredUpdates = static_cast<uint32_t> (
+              std::ceil (std::max ({distanceChangeMeters / 4.0, speedChangeMps / 0.5, 1.0})));
+          const double rl =
+              static_cast<double> (receivedUpdates) / static_cast<double> (requiredUpdates);
+          const double rv = ComputeDeloozRv (rl);
+          receiverRlValues.push_back (rl);
+          receiverRvValues.push_back (rv);
+          g_thesisStats.receiverRlSum += rl;
+          g_thesisStats.receiverRvDeloozSum += rv;
+          ++g_thesisStats.receiverRlSamples;
+          if (rl < 1.0)
+            {
+              ++g_thesisStats.receiverRlLt1;
+            }
+          if (rl >= 1.0)
+            {
+              ++g_thesisStats.receiverRlGe1;
+            }
+          if (rl >= 2.0)
+            {
+              ++g_thesisStats.receiverRlGe2;
+            }
           if (fresh200 >= 2)
             {
               ++g_thesisStats.receiverFreshRedundancyGe2_200;
@@ -2274,12 +2410,22 @@ AccumulateThesisRecognitionSample ()
             {
               g_thesisStats.receiverFreshRedundancyHigh200Sum += fresh200;
               ++g_thesisStats.receiverFreshRedundancyHighSamples;
+              g_thesisStats.receiverHighRlSum += rl;
+              ++g_thesisStats.receiverHighRlSamples;
             }
           else
             {
               g_thesisStats.receiverFreshRedundancyLow200Sum += fresh200;
               ++g_thesisStats.receiverFreshRedundancyLowSamples;
+              g_thesisStats.receiverLowRlSum += rl;
+              ++g_thesisStats.receiverLowRlSamples;
             }
+        }
+      if (!receiverRlValues.empty ())
+        {
+          g_thesisStats.receiverRlMedianSum += Percentile (receiverRlValues, 50.0);
+          g_thesisStats.receiverRvDeloozMedianSum += Percentile (receiverRvValues, 50.0);
+          ++g_thesisStats.receiverRlVehicleSamples;
         }
 
       std::set<uint64_t> cpmRecognizedStationIds;
@@ -2758,6 +2904,12 @@ AccumulateThesisRecognitionSample ()
       PriorityMotionState state;
       state.position = entry.second;
       state.timestamp = now;
+      const auto velocityIt = activeStationVelocities.find (entry.first);
+      if (velocityIt != activeStationVelocities.end ())
+        {
+          state.velocity = velocityIt->second;
+          state.hasVelocity = true;
+        }
       g_priorityMotionHistory[entry.first] = state;
     }
 }
@@ -3664,6 +3816,10 @@ OpenObservationLog (const std::string& path)
       << "receiver_high_fresh_redundancy_200ms_mean,"
       << "receiver_low_fresh_redundancy_200ms_mean,"
       << "receiver_rv_200ms_score,"
+      << "receiver_rl_mean,receiver_rl_median,"
+      << "receiver_rl_lt1_rate,receiver_rl_ge1_rate,receiver_rl_ge2_rate,"
+      << "receiver_rv_delooz_mean,receiver_rv_delooz_median,"
+      << "receiver_high_rl_mean,receiver_low_rl_mean,"
       << "rmr_deleted_eval_expected_total,rmr_deleted_eval_expected_high,"
       << "rmr_deleted_eval_expected_low,rmr_deleted_eval_unrecognized_total,"
       << "rmr_deleted_eval_unrecognized_high,rmr_deleted_eval_unrecognized_low,"
@@ -4564,6 +4720,33 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
                        << FormatThesisMetric (AverageFromSum (
                               g_thesisStats.receiverRv200Sum,
                               g_thesisStats.receiverFreshRedundancySamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverRlSum,
+                              g_thesisStats.receiverRlSamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverRlMedianSum,
+                              g_thesisStats.receiverRlVehicleSamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.receiverRlLt1,
+                              g_thesisStats.receiverRlSamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.receiverRlGe1,
+                              g_thesisStats.receiverRlSamples)) << ","
+                       << FormatThesisMetric (PercentRate (
+                              g_thesisStats.receiverRlGe2,
+                              g_thesisStats.receiverRlSamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverRvDeloozSum,
+                              g_thesisStats.receiverRlSamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverRvDeloozMedianSum,
+                              g_thesisStats.receiverRlVehicleSamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverHighRlSum,
+                              g_thesisStats.receiverHighRlSamples)) << ","
+                       << FormatThesisMetric (AverageFromSum (
+                              g_thesisStats.receiverLowRlSum,
+                              g_thesisStats.receiverLowRlSamples)) << ","
                        << g_thesisStats.rmrDeletedEvalExpectedTotal << ","
                        << g_thesisStats.rmrDeletedEvalExpectedHigh << ","
                        << g_thesisStats.rmrDeletedEvalExpectedLow << ","
@@ -5944,7 +6127,6 @@ main (int argc, char* argv[])
 
   if (method == "no-control")
     {
-      enableReactiveRmr = false;
       enablePredictiveRmr = false;
       enableRouteControl = false;
     }
@@ -7259,6 +7441,7 @@ main (int argc, char* argv[])
       }
     g_latestMecCpmGenerationTimeByReceiver.erase (stationId);
     g_latestActualCpmObjectRxByReceiver.erase (stationId);
+    g_cpmObjectUpdateHistoryByReceiver.erase (stationId);
     for (auto& entry : g_latestCpmRxByReceiver)
       {
         entry.second.erase (stationId);
@@ -7287,6 +7470,10 @@ main (int argc, char* argv[])
         entry.second.erase (stationId);
       }
     for (auto& entry : g_latestActualCpmObjectRxByReceiver)
+      {
+        entry.second.erase (stationId);
+      }
+    for (auto& entry : g_cpmObjectUpdateHistoryByReceiver)
       {
         entry.second.erase (stationId);
       }
@@ -7730,6 +7917,10 @@ main (int argc, char* argv[])
           << "receiver_high_fresh_redundancy_200ms_mean,"
           << "receiver_low_fresh_redundancy_200ms_mean,"
           << "receiver_rv_200ms_score,"
+          << "receiver_rl_mean,receiver_rl_median,"
+          << "receiver_rl_lt1_rate,receiver_rl_ge1_rate,receiver_rl_ge2_rate,"
+          << "receiver_rv_delooz_mean,receiver_rv_delooz_median,"
+          << "receiver_high_rl_mean,receiver_low_rl_mean,"
           << "rmr_deleted_eval_expected_total,rmr_deleted_eval_expected_high,"
           << "rmr_deleted_eval_expected_low,rmr_deleted_eval_unrecognized_total,"
           << "rmr_deleted_eval_unrecognized_high,rmr_deleted_eval_unrecognized_low,"
@@ -7851,6 +8042,33 @@ main (int argc, char* argv[])
                  << FormatThesisMetric (AverageFromSum (
                         g_thesisStats.receiverRv200Sum,
                         g_thesisStats.receiverFreshRedundancySamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverRlSum,
+                        g_thesisStats.receiverRlSamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverRlMedianSum,
+                        g_thesisStats.receiverRlVehicleSamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.receiverRlLt1,
+                        g_thesisStats.receiverRlSamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.receiverRlGe1,
+                        g_thesisStats.receiverRlSamples)) << ","
+                 << FormatThesisMetric (PercentRate (
+                        g_thesisStats.receiverRlGe2,
+                        g_thesisStats.receiverRlSamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverRvDeloozSum,
+                        g_thesisStats.receiverRlSamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverRvDeloozMedianSum,
+                        g_thesisStats.receiverRlVehicleSamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverHighRlSum,
+                        g_thesisStats.receiverHighRlSamples)) << ","
+                 << FormatThesisMetric (AverageFromSum (
+                        g_thesisStats.receiverLowRlSum,
+                        g_thesisStats.receiverLowRlSamples)) << ","
                  << g_thesisStats.rmrDeletedEvalExpectedTotal << ","
                  << g_thesisStats.rmrDeletedEvalExpectedHigh << ","
                  << g_thesisStats.rmrDeletedEvalExpectedLow << ","
