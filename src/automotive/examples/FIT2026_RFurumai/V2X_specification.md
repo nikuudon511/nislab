@@ -288,6 +288,30 @@ Required AoI logs:
   achievement rate among received MEC updates, not a radio packet-loss rate.
 - Capacity queue drops as the first implemented deadline-related drop signal.
 
+### 5.1 Recognition TTL Sensitivity
+
+Recognition TTL is an application-level validity window for object-recognition
+state.  It is not a radio packet lifetime and should not be reported as radio
+packet loss.
+
+The current main evaluation uses:
+
+- High-priority recognition TTL: 0.2 s.
+- Low-priority recognition TTL: 0.5 s.
+
+These values are evaluation assumptions.  They are chosen to represent stricter
+freshness for safety-critical objects and more tolerant freshness for
+low-priority objects.  They should not be presented as fixed ETSI standard
+values.
+
+For sensitivity analysis, the stricter setting is:
+
+- High-priority recognition TTL: 0.1 s.
+- Low-priority recognition TTL: 0.2 s.
+
+The strict TTL run is required to check whether the ORR improvement of
+Hybrid+RMR depends too strongly on the relaxed low-priority 0.5 s TTL.
+
 ## 6. Drop Reasons
 
 Packet loss, stale updates, and recognition-state failures must be decomposed by
@@ -344,6 +368,48 @@ congestion over distance-dependent V2N2V packet loss, because the modeled
 MEC range changes the number of forwarded receivers much more directly than it
 changes Uu radio distance.  If distance-dependent Uu loss is needed, a separate
 UE-gNB distance/SINR or distance-bin loss model must be added.
+
+### 6.2 MEC Fanout RMR and Long-Tail Delete Budget
+
+MEC fanout RMR is different from the conventional CPM object-level RMR.
+
+- Conventional CPM RMR removes perceived objects from the CPM payload before a
+  vehicle transmits.
+- MEC fanout RMR suppresses selected MEC downlink forwarding targets.  It means
+  that the MEC does not forward a particular update to some receiver vehicles
+  under load.
+
+In the current lightweight V2N2V model, MEC fanout RMR is applied to the MEC
+downlink fanout list.  The deletion priority is:
+
+1. Prefer low-priority receivers.
+2. If priority is equal, prefer farther receivers.
+3. Increase the delete budget when MEC downlink busy ratio is high.
+
+The current fixed RMR budgets are:
+
+- Low CBR: 10.
+- Middle CBR: 20.
+- High CBR: 40.
+
+The long-tail RMR budgets are:
+
+| MEC downlink busy ratio | Delete budget |
+|---:|---:|
+| `<= rmr-cbr-low` | 10 |
+| `<= rmr-cbr-high` | 20 |
+| `<= 0.85` | 40 |
+| `<= 0.95` | 80 |
+| `> 0.95` | 160 |
+
+The long-tail design keeps deletion mild during low load and applies aggressive
+fanout suppression only during severe MEC downlink congestion.  This is intended
+to reduce tail queueing delay and AoI violations without unnecessarily removing
+recognition opportunities during light load.
+
+This mechanism primarily affects V2N2V and Hybrid runs using the lightweight
+MEC path.  It is not expected to change V2V-only behavior much, because V2V-only
+RMR still operates through CPM object deletion rather than MEC fanout deletion.
 
 ## 7. Comparison Methods
 

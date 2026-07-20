@@ -222,6 +222,14 @@ struct IdealMecLoopIndexEntry
   std::size_t vehicleIndex = 0;
 };
 
+struct IdealMecReceiverCandidate
+{
+  uint64_t stationId = 0;
+  bool highPriority = false;
+  double distanceMeters = 0.0;
+  double score = 0.0;
+};
+
 struct SensorExternalEventState
 {
   bool triggered = false;
@@ -413,6 +421,7 @@ static uint64_t g_mecForwardedPackets = 0;
 static uint64_t g_mecForwardedBytes = 0;
 static uint64_t g_lastMecUplinkBytesForBusyRatio = 0;
 static uint64_t g_lastMecForwardedBytesForBusyRatio = 0;
+static double g_lastMecDlBusyRatioForRmr = 0.0;
 static uint64_t g_mecBackgroundUplinkBytes = 0;
 static uint64_t g_mecBackgroundDownlinkBytes = 0;
 static std::vector<double> g_mecUlBusyRatioSamples;
@@ -477,6 +486,35 @@ static std::array<uint64_t, 4> g_idealMecLowAoiWithinThreshold = {{0, 0, 0, 0}};
 static const std::array<double, 4> g_idealMecAoiThresholdsMs = {{200.0, 300.0, 400.0, 500.0}};
 static bool g_idealMecAoiFilter = false;
 static double g_idealMecAoiFilterThresholdMs = 200.0;
+static bool g_idealMecRmrEnabled = false;
+static double g_idealMecRmrCbrLow = 0.33;
+static double g_idealMecRmrCbrHigh = 0.67;
+static uint32_t g_idealMecRmrDeleteLow = 10;
+static uint32_t g_idealMecRmrDeleteMiddle = 20;
+static uint32_t g_idealMecRmrDeleteHigh = 40;
+static bool g_idealMecRmrLongTail = false;
+static double g_idealMecRmrLongTailVeryHighCbr = 0.85;
+static double g_idealMecRmrLongTailExtremeCbr = 0.95;
+static uint32_t g_idealMecRmrDeleteVeryHigh = 80;
+static uint32_t g_idealMecRmrDeleteExtreme = 160;
+static uint32_t g_idealMecRmrCandidatesLast = 0;
+static uint32_t g_idealMecRmrDeletedLast = 0;
+static uint32_t g_idealMecRmrDeletedNearLast = 0;
+static uint32_t g_idealMecRmrDeletedFarLast = 0;
+static uint32_t g_idealMecCpmObjectsLast = 0;
+static uint32_t g_idealMecCpmSizeBytesLast = 0;
+static uint64_t g_idealMecRmrCandidatesTotal = 0;
+static uint64_t g_idealMecRmrDeletedTotal = 0;
+static uint64_t g_idealMecRmrDeletedNearTotal = 0;
+static uint64_t g_idealMecRmrDeletedFarTotal = 0;
+static uint64_t g_idealMecCpmObjectsTotal = 0;
+static uint64_t g_idealMecCpmSizeBytesTotal = 0;
+static uint64_t g_idealMecRmrDeletedFeatureCount = 0;
+static double g_idealMecRmrDeletedDistanceSum = 0.0;
+static double g_idealMecRmrDeletedFrequencySum = 0.0;
+static double g_idealMecRmrDeletedPositionChangeSum = 0.0;
+static double g_idealMecRmrDeletedSpeedChangeSum = 0.0;
+static double g_idealMecRmrDeletedScoreSum = 0.0;
 static bool g_mecBackgroundLoad = false;
 static bool g_mecBackgroundPerVehicle = true;
 static uint32_t g_mecBackgroundPacketSizeBytes = 500;
@@ -1392,6 +1430,44 @@ ReserveIdealMecCapacity (Time arrivalTime, uint32_t bytes, double capacityMbps, 
   return finish - arrivalTime;
 }
 
+static uint32_t
+IdealMecRmrDeleteBudget ()
+{
+  if (!g_idealMecRmrEnabled)
+    {
+      return 0;
+    }
+  if (g_idealMecRmrLongTail)
+    {
+      if (g_lastMecDlBusyRatioForRmr <= g_idealMecRmrCbrLow)
+        {
+          return g_idealMecRmrDeleteLow;
+        }
+      if (g_lastMecDlBusyRatioForRmr <= g_idealMecRmrCbrHigh)
+        {
+          return g_idealMecRmrDeleteMiddle;
+        }
+      if (g_lastMecDlBusyRatioForRmr <= g_idealMecRmrLongTailVeryHighCbr)
+        {
+          return g_idealMecRmrDeleteHigh;
+        }
+      if (g_lastMecDlBusyRatioForRmr <= g_idealMecRmrLongTailExtremeCbr)
+        {
+          return g_idealMecRmrDeleteVeryHigh;
+        }
+      return g_idealMecRmrDeleteExtreme;
+    }
+  if (g_lastMecDlBusyRatioForRmr <= g_idealMecRmrCbrLow)
+    {
+      return g_idealMecRmrDeleteLow;
+    }
+  if (g_lastMecDlBusyRatioForRmr <= g_idealMecRmrCbrHigh)
+    {
+      return g_idealMecRmrDeleteMiddle;
+    }
+  return g_idealMecRmrDeleteHigh;
+}
+
 static void
 GenerateIdealMecBackgroundLoad ()
 {
@@ -1438,6 +1514,12 @@ GenerateIdealMecCpm ()
   std::vector<std::size_t> activeSenderIndexes;
   vehiclePositions.reserve (g_vehicleRuntime.size ());
   activeSenderIndexes.reserve (g_vehicleRuntime.size ());
+  g_idealMecRmrCandidatesLast = 0;
+  g_idealMecRmrDeletedLast = 0;
+  g_idealMecRmrDeletedNearLast = 0;
+  g_idealMecRmrDeletedFarLast = 0;
+  g_idealMecCpmObjectsLast = 0;
+  g_idealMecCpmSizeBytesLast = 0;
 
   for (const auto& entry : g_vehicleRuntime)
     {
@@ -1496,7 +1578,7 @@ GenerateIdealMecCpm ()
                                    g_idealMecUplinkCapacityMbps,
                                    g_idealMecUplinkAvailableAt);
 
-      uint32_t targets = 0;
+      std::vector<IdealMecReceiverCandidate> candidates;
       std::vector<std::pair<uint64_t, bool>> receivers;
       const double minLoopPosition = senderEntry.loopPositionMeters - g_mecForwardRangeMeters;
       const double maxLoopPosition = senderEntry.loopPositionMeters + g_mecForwardRangeMeters;
@@ -1544,7 +1626,63 @@ GenerateIdealMecCpm ()
                 }
             }
 
-          if (highPriority)
+          IdealMecReceiverCandidate candidate;
+          candidate.stationId = VehicleIdToStationId (receiverEntry.vehicleId);
+          candidate.highPriority = highPriority;
+          candidate.distanceMeters = distanceMeters;
+          candidate.score = (highPriority ? 1.0e6 : 0.0) - distanceMeters;
+          candidates.push_back (candidate);
+        }
+
+      g_idealMecRmrCandidatesLast += static_cast<uint32_t> (candidates.size ());
+      g_idealMecRmrCandidatesTotal += candidates.size ();
+      const uint32_t deleteBudget =
+          std::min<uint32_t> (IdealMecRmrDeleteBudget (),
+                              static_cast<uint32_t> (candidates.size ()));
+      if (deleteBudget > 0)
+        {
+          std::sort (candidates.begin (),
+                     candidates.end (),
+                     [] (const IdealMecReceiverCandidate& lhs,
+                         const IdealMecReceiverCandidate& rhs) {
+                       if (lhs.highPriority != rhs.highPriority)
+                         {
+                           return !lhs.highPriority;
+                         }
+                       if (lhs.score != rhs.score)
+                         {
+                           return lhs.score < rhs.score;
+                         }
+                       return lhs.stationId < rhs.stationId;
+                     });
+        }
+
+      for (uint32_t i = 0; i < candidates.size (); ++i)
+        {
+          if (i < deleteBudget)
+            {
+              ++g_idealMecRmrDeletedLast;
+              ++g_idealMecRmrDeletedTotal;
+              ++g_idealMecRmrDeletedFeatureCount;
+              g_idealMecRmrDeletedDistanceSum += candidates[i].distanceMeters;
+              g_idealMecRmrDeletedFrequencySum += 1.0;
+              g_idealMecRmrDeletedPositionChangeSum += 0.0;
+              g_idealMecRmrDeletedSpeedChangeSum += 0.0;
+              g_idealMecRmrDeletedScoreSum += candidates[i].score;
+              if (candidates[i].distanceMeters <= g_priorityDistanceThresholdMeters)
+                {
+                  ++g_idealMecRmrDeletedNearLast;
+                  ++g_idealMecRmrDeletedNearTotal;
+                }
+              else
+                {
+                  ++g_idealMecRmrDeletedFarLast;
+                  ++g_idealMecRmrDeletedFarTotal;
+                }
+              continue;
+            }
+
+          if (candidates[i].highPriority)
             {
               ++g_idealMecHighAttempts;
             }
@@ -1552,13 +1690,16 @@ GenerateIdealMecCpm ()
             {
               ++g_idealMecLowAttempts;
             }
-          ++targets;
           ++g_mecForwardedPackets;
           g_mecForwardedBytes += mecPacketSizeBytes;
-          receivers.emplace_back (VehicleIdToStationId (receiverEntry.vehicleId), highPriority);
+          ++g_idealMecCpmObjectsLast;
+          ++g_idealMecCpmObjectsTotal;
+          g_idealMecCpmSizeBytesLast += mecPacketSizeBytes;
+          g_idealMecCpmSizeBytesTotal += mecPacketSizeBytes;
+          receivers.emplace_back (candidates[i].stationId, candidates[i].highPriority);
         }
 
-      if (targets == 0)
+      if (receivers.empty ())
         {
           ++g_mecForwardNoReceiver;
         }
@@ -4348,6 +4489,27 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
           mecCpmSent += mecCp->getCpmSent ();
         }
     }
+  if (g_useIdealMecLink)
+    {
+      mecCpmObjects = g_idealMecCpmObjectsLast;
+      mecRmrCandidates = g_idealMecRmrCandidatesLast;
+      mecRmrDeletedLast = g_idealMecRmrDeletedLast;
+      mecRmrDeletedNearLast = g_idealMecRmrDeletedNearLast;
+      mecRmrDeletedFarLast = g_idealMecRmrDeletedFarLast;
+      mecCpmObjectsTotal = g_idealMecCpmObjectsTotal;
+      mecRmrCandidatesTotal = g_idealMecRmrCandidatesTotal;
+      mecRmrDeletedTotal = g_idealMecRmrDeletedTotal;
+      mecRmrDeletedNearTotal = g_idealMecRmrDeletedNearTotal;
+      mecRmrDeletedFarTotal = g_idealMecRmrDeletedFarTotal;
+      mecCpmSizeBytes = g_idealMecCpmSizeBytesLast;
+      mecCpmSizeBytesTotal = g_idealMecCpmSizeBytesTotal;
+      rmrDeletedFeatureCount += g_idealMecRmrDeletedFeatureCount;
+      rmrDeletedDistanceSum += g_idealMecRmrDeletedDistanceSum;
+      rmrDeletedFrequencySum += g_idealMecRmrDeletedFrequencySum;
+      rmrDeletedPositionChangeSum += g_idealMecRmrDeletedPositionChangeSum;
+      rmrDeletedSpeedChangeSum += g_idealMecRmrDeletedSpeedChangeSum;
+      rmrDeletedScoreSum += g_idealMecRmrDeletedScoreSum;
+    }
   for (const auto& entry : g_allVehicleNodes)
     {
       if (IsInMovingBackgroundHighLoadZone (entry.first))
@@ -4462,6 +4624,7 @@ WriteObservationLog (Ptr<MetricSupervisor> channelMetrics,
           : 0.0;
   g_mecUlBusyRatioSamples.push_back (mecUlBusyRatio);
   g_mecDlBusyRatioSamples.push_back (mecDlBusyRatio);
+  g_lastMecDlBusyRatioForRmr = mecDlBusyRatio;
 
   if (g_observationLog.is_open ())
     {
@@ -5671,6 +5834,11 @@ main (int argc, char* argv[])
   uint32_t rmrDeleteLow = 10;
   uint32_t rmrDeleteMiddle = 20;
   uint32_t rmrDeleteHigh = 40;
+  bool mecIdealRmrLongTail = false;
+  double mecIdealRmrLongTailVeryHighCbr = 0.85;
+  double mecIdealRmrLongTailExtremeCbr = 0.95;
+  uint32_t mecIdealRmrDeleteVeryHigh = 80;
+  uint32_t mecIdealRmrDeleteExtreme = 160;
   uint32_t rmrWindowMs = 1000;
   bool rmrProtectNearObjects = false;
   double predictionHorizonSeconds = 20.0;
@@ -5858,6 +6026,21 @@ main (int argc, char* argv[])
   cmd.AddValue ("rmr-delete-low", "Objects deleted per CPM in low CBR phase", rmrDeleteLow);
   cmd.AddValue ("rmr-delete-middle", "Objects deleted per CPM in middle CBR phase", rmrDeleteMiddle);
   cmd.AddValue ("rmr-delete-high", "Objects deleted per CPM in high CBR phase", rmrDeleteHigh);
+  cmd.AddValue ("mec-ideal-rmr-longtail",
+                "Use 5-step long-tail deletion budget for lightweight MEC fanout RMR",
+                mecIdealRmrLongTail);
+  cmd.AddValue ("mec-ideal-rmr-longtail-very-high-cbr",
+                "Very-high threshold for lightweight MEC long-tail RMR",
+                mecIdealRmrLongTailVeryHighCbr);
+  cmd.AddValue ("mec-ideal-rmr-longtail-extreme-cbr",
+                "Extreme threshold for lightweight MEC long-tail RMR",
+                mecIdealRmrLongTailExtremeCbr);
+  cmd.AddValue ("mec-ideal-rmr-delete-very-high",
+                "Objects deleted per lightweight MEC CPM in very-high busy phase",
+                mecIdealRmrDeleteVeryHigh);
+  cmd.AddValue ("mec-ideal-rmr-delete-extreme",
+                "Objects deleted per lightweight MEC CPM in extreme busy phase",
+                mecIdealRmrDeleteExtreme);
   cmd.AddValue ("rmr-window-ms", "Time window used for Frequency-based RMR observation count", rmrWindowMs);
   cmd.AddValue ("rmr-protect-near-objects",
                 "Exclude objects within --priority-distance from RMR deletion candidates",
@@ -6152,7 +6335,6 @@ main (int argc, char* argv[])
     }
   else if (method == "v2n2v-only")
     {
-      enableReactiveRmr = false;
       enablePredictiveRmr = false;
       enableRouteControl = false;
       enableMecV2n2v = true;
@@ -6507,6 +6689,17 @@ main (int argc, char* argv[])
   g_idealMecRetxDelayMs = mecIdealRetxDelayMs;
   g_idealMecAoiFilter = mecIdealAoiFilter;
   g_idealMecAoiFilterThresholdMs = mecIdealAoiFilterThresholdMs;
+  g_idealMecRmrEnabled = enableReactiveRmr && g_useIdealMecLink && enableMecV2n2v;
+  g_idealMecRmrCbrLow = rmrCbrLow;
+  g_idealMecRmrCbrHigh = rmrCbrHigh;
+  g_idealMecRmrDeleteLow = rmrDeleteLow;
+  g_idealMecRmrDeleteMiddle = rmrDeleteMiddle;
+  g_idealMecRmrDeleteHigh = rmrDeleteHigh;
+  g_idealMecRmrLongTail = mecIdealRmrLongTail;
+  g_idealMecRmrLongTailVeryHighCbr = mecIdealRmrLongTailVeryHighCbr;
+  g_idealMecRmrLongTailExtremeCbr = mecIdealRmrLongTailExtremeCbr;
+  g_idealMecRmrDeleteVeryHigh = mecIdealRmrDeleteVeryHigh;
+  g_idealMecRmrDeleteExtreme = mecIdealRmrDeleteExtreme;
   g_mecBackgroundLoad = mecBackgroundLoad;
   g_mecBackgroundPerVehicle = mecBackgroundPerVehicle;
   g_mecBackgroundPacketSizeBytes = mecBackgroundPacketSizeBytes;
