@@ -6,6 +6,24 @@ This document defines the simulation assumptions for NR-V2X sidelink V2V and
 Uu/MEC-based V2N2V cooperative perception evaluation.  It is intended to prevent
 future mismatches between implementation, plots, and presentation claims.
 
+This specification is the stable source for evaluation assumptions and metric
+definitions.  Experiment files, figures, and paper claims are tracked separately:
+
+- `docs/research/experiment_index.md`: result-directory, CSV, and figure index.
+- `docs/research/claim_evidence_index.md`: research claims, supporting
+  experiments, counter evidence, confidence, and paper-writing status.
+- `docs/research/metric_definitions.md`: KPI and diagnostic metric definitions
+  for slide and paper wording.
+- `docs/research/log_schema_index.md`: CSV/log schema and clean-run
+  requirements.
+- `docs/research/codex_progress_template.md`: weekly progress-note template.
+
+When a result or figure is used for a presentation or paper draft, first confirm
+that it is registered in the experiment index and that the related claim is
+registered in the claim/evidence index.  This keeps this specification focused
+on assumptions, while the claim index tracks which claims are already supported
+by clean evidence.
+
 The target scenario is a Japanese highway-like environment with vehicle-dense
 sections.  The final evaluation should avoid artificial background load when
 possible and should generate congestion through dense vehicle clusters and real
@@ -112,6 +130,7 @@ without recording the source.
 | RMR CBR thresholds | 0.33 / 0.67 | prior-work setting | Yamazaki RMR method | Reactive and predictive RMR deletion phases |
 | RMR delete count | 10 / 20 / 40 objects | prior-work setting | Yamazaki RMR method | Maximum redundant objects deleted per CPM |
 | MEC V2N2V packet size | latest observed CPM size | implementation-derived | CPBasicService CPM serialization size | Uplink/downlink byte accounting and queueing |
+| MEC/vehicle compute budget for CP control | 300-500 MIPS class | adopted assumption | Hui Huang et al. / MEC-assisted collective perception response-time discussion | RMR, route selection, CPM handling, and MEC-side filtering are assumed not to dominate the 100 ms-class real-time response budget |
 | Uu first-transmission BLER | 0.10 | adopted main setting | V2X_V2N communication-parameter survey: eMBB ILLA/OLLA BLER target | Abstract Uu first-transmission loss rate |
 | Uu first-transmission BLER, URLLC case | 0.01 | adopted sensitivity candidate | Same survey: URLLC/safety-profile BLER target | Optional low-loss sensitivity run |
 | HARQ max retransmissions | 4 | adopted main setting | V2X_V2N communication-parameter survey: typical HARQ retransmission limit | Abstract retransmission limit |
@@ -130,6 +149,16 @@ This is a service-rate proxy for the lightweight queue model.  V2N2V uses Uu,
 so its actual bandwidth is determined by the mobile network operator and
 deployment; it is not legally fixed by the ITS PC5 band.  If a specific Uu
 carrier bandwidth is assumed, it must be stated explicitly and recorded here.
+
+The simulation currently models MEC processing by delay parameters, but
+MEC-assisted collective perception also has a computation budget.  Hui Huang et
+al. discuss that maintaining real-time response around 100 ms requires keeping
+edge-side algorithmic complexity within roughly the 300-500 MIPS class.
+Therefore, this study assumes that MEC and vehicle-side V2X applications have
+sufficient compute resources in this class to execute CPM handling, RMR
+scoring/object selection, and route-control logic.  The evaluated bottleneck is
+communication and queueing load, especially MEC downlink fanout and CPM payload
+size, rather than CPU overload.
 
 The final model must not treat V2N2V as a lossless fixed-delay link.  It must
 include at least:
@@ -288,29 +317,29 @@ Required AoI logs:
   achievement rate among received MEC updates, not a radio packet-loss rate.
 - Capacity queue drops as the first implemented deadline-related drop signal.
 
-### 5.1 Recognition TTL Sensitivity
+### 5.1 Recognition TTL
 
 Recognition TTL is an application-level validity window for object-recognition
 state.  It is not a radio packet lifetime and should not be reported as radio
 packet loss.
 
-The current main evaluation uses:
+The current main evaluation uses the same recognition TTL for both priority
+classes:
 
 - High-priority recognition TTL: 0.2 s.
-- Low-priority recognition TTL: 0.5 s.
-
-These values are evaluation assumptions.  They are chosen to represent stricter
-freshness for safety-critical objects and more tolerant freshness for
-low-priority objects.  They should not be presented as fixed ETSI standard
-values.
-
-For sensitivity analysis, the stricter setting is:
-
-- High-priority recognition TTL: 0.1 s.
 - Low-priority recognition TTL: 0.2 s.
 
-The strict TTL run is required to check whether the ORR improvement of
-Hybrid+RMR depends too strongly on the relaxed low-priority 0.5 s TTL.
+This value is an evaluation assumption and should not be presented as a fixed
+ETSI standard value.  The evaluation does not give low-priority objects a longer
+validity window, because a 0.5 s recognition state can correspond to more than
+10 m of position error in a highway-speed environment.  Using a longer TTL only
+for low-priority objects would make low-priority ORR easier to satisfy and would
+bias the comparison.
+
+The 0.2 s TTL is intended to tolerate roughly one missed update, retransmission,
+or moderate delivery delay, but updates older than this are treated as stale and
+are not counted as valid recognition.  This keeps ORR tied to fresh cooperative
+perception rather than long-lived recognition state.
 
 ## 6. Drop Reasons
 
@@ -410,6 +439,49 @@ recognition opportunities during light load.
 This mechanism primarily affects V2N2V and Hybrid runs using the lightweight
 MEC path.  It is not expected to change V2V-only behavior much, because V2V-only
 RMR still operates through CPM object deletion rather than MEC fanout deletion.
+
+### 6.3 Prediction-Aware Guarded RMR
+
+Existing RMR results remain valid as the baseline fixed-RMR method.  After
+adding guard rules and prediction-aware control, the new results must be
+reported as an improved method, not as a direct rerun of the old RMR method.
+
+Recommended comparison groups:
+
+- Hybrid baseline: no RMR.
+- Hybrid + fixed RMR: 10/20/40 delete budget, no important-information guard.
+- Hybrid + Guarded RMR: important-information guard enabled, no prediction.
+- Hybrid + Prediction-aware Guarded RMR: guard enabled and predicted CBR used
+  as an auxiliary RMR control signal.
+
+Guarded RMR policy:
+
+- Do not delete hard-safety candidates: very near objects/receivers or
+  approaching/TTC-critical MEC fanout pairs.
+- Do not fully protect all high-priority candidates.  High-priority candidates
+  should be deleted after low-priority candidates, but they may still be deleted
+  when they are far and not TTC-critical.
+- Use prediction only to adjust deletion pressure for unguarded low-priority
+  candidates.
+
+The initial hard-guard policy that protected all high-priority MEC fanout pairs
+caused MEC downlink fanout to grow too much and degraded ORR.  Therefore, the
+current policy is a soft guard:
+
+- Absolute guard distance: 30 m.
+- Absolute guard TTC: 3 s.
+- High-priority but non-critical candidates are weakly protected by deletion
+  ordering, not by complete exclusion.
+
+Prediction policy:
+
+- Predicted CBR must be clipped and smoothed before it controls RMR.
+- Prediction must not directly force all candidates into aggressive deletion.
+- If prediction is wrong or saturates, guarded candidates must still be kept.
+
+The intended research claim is that bandwidth prediction improves RMR only when
+combined with important-information protection.  Prediction by itself can make
+ORR worse if it overestimates congestion and removes useful updates.
 
 ## 7. Comparison Methods
 

@@ -128,6 +128,10 @@ namespace ns3 {
     m_rmr_delete_middle = 20;
     m_rmr_delete_high = 40;
     m_rmr_window_ms = 1000;
+    m_rmr_guard_important = false;
+    m_rmr_guard_distance_m = 100.0;
+    m_rmr_guard_position_change_m = 4.0;
+    m_rmr_guard_speed_change_mps = 0.5;
     m_last_rmr_candidate_count = 0;
     m_last_rmr_included_objects = 0;
     m_last_rmr_deleted_objects = 0;
@@ -180,6 +184,18 @@ namespace ns3 {
     m_rmr_frequency_weight = frequencyWeight;
     m_rmr_dynamics_weight = dynamicsWeight;
     m_rmr_distance_weight = distanceWeight;
+  }
+
+  void
+  CPBasicService::configureRmrImportantGuard(bool enabled,
+                                             double protectedDistanceMeters,
+                                             double protectedPositionChangeMeters,
+                                             double protectedSpeedChangeMps)
+  {
+    m_rmr_guard_important = enabled;
+    m_rmr_guard_distance_m = std::max (0.0, protectedDistanceMeters);
+    m_rmr_guard_position_change_m = std::max (0.0, protectedPositionChangeMeters);
+    m_rmr_guard_speed_change_mps = std::max (0.0, protectedSpeedChangeMps);
   }
 
   void
@@ -397,6 +413,17 @@ namespace ns3 {
         candidate.positionChange = positionChange;
         candidate.speedChange = speedChange;
         candidate.distance = distance;
+        const bool protectedDynamic =
+            candidate.distance <= m_rmr_guard_distance_m &&
+            (candidate.positionChange >= m_rmr_guard_position_change_m ||
+             candidate.speedChange >= m_rmr_guard_speed_change_mps);
+        if (m_rmr_guard_important &&
+            (IsPedestrianObject (candidate.stationType) ||
+             candidate.distance <= m_rmr_guard_distance_m ||
+             protectedDynamic))
+          {
+            continue;
+          }
         candidates.push_back (candidate);
       }
 

@@ -147,6 +147,10 @@ public:
                            double dynamicsWeight,
                            double distanceWeight);
   void setRmrWindowMs(uint32_t windowMs){m_rmr_window_ms = windowMs;}
+  void configureRmrImportantGuard(bool enabled,
+                                  double protectedDistanceMeters,
+                                  double protectedPositionChangeMeters,
+                                  double protectedSpeedChangeMps);
   uint32_t getLastRmrCandidateCount() const {return m_last_rmr_candidate_count;}
   uint32_t getLastRmrIncludedObjectCount() const {return m_last_rmr_included_objects;}
   uint32_t getLastRmrDeletedObjectCount() const {return m_last_rmr_deleted_objects;}
@@ -230,6 +234,10 @@ private:
   uint32_t m_rmr_delete_middle;
   uint32_t m_rmr_delete_high;
   uint32_t m_rmr_window_ms;
+  bool m_rmr_guard_important;
+  double m_rmr_guard_distance_m;
+  double m_rmr_guard_position_change_m;
+  double m_rmr_guard_speed_change_mps;
   uint32_t m_last_rmr_candidate_count;
   uint32_t m_last_rmr_included_objects;
   uint32_t m_last_rmr_deleted_objects;
