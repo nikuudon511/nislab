@@ -1,0 +1,106 @@
+\documentclass[a4paper,10pt,twocolumn,uplatex]{jsarticle}
+\usepackage{nislab,../resume}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{amsmath, amssymb}
+\usepackage{bm}
+
+%---------------------------------------------------------------------
+% レジュメ種別・日付設定
+%---------------------------------------------------------------------
+\type{3}
+\year{2026}
+\month{8}
+\date{4}
+
+%---------------------------------------------------------------------
+% ページ番号設定
+%---------------------------------------------------------------------
+\setcounter{page}{1}
+
+\begin{document}
+
+%---------------------------------------------------------------------
+% タイトル作成部分
+%---------------------------------------------------------------------
+\maketitle{高密度環境における協調認識のための
+\\V2V/V2N2VハイブリッドCPM共有方式の評価}
+{Evaluation of V2V/V2N2V Hybrid CPM Sharing
+\\for Cooperative Perception in Dense Traffic}
+{古米 遼成}
+{Ryosei Furumai}
+
+%---------------------------------------------------------------------
+\section{はじめに}
+自動運転車両の安全性向上に向けて，車載センサで取得した周辺物標情報をCollective Perception Message（CPM）として共有する協調認識が注目されている．また，自動運転の社会実装に向けて，V2Xとセルラ網の相互補完的な活用が重要な通信基盤として位置づけられている~\cite{digital_lifeline}．CPMにより，自車センサでは観測できない死角領域の物標を周辺車両から補完できる．一方，高車両密度環境では，多数の車両が類似した物標情報を同時に送信するため，無線チャネルの逼迫，パケット損失，および情報鮮度の低下が発生し，協調認識性能が低下する．
+
+先行研究では，CPM内の冗長な物標情報を削除する冗長性緩和手法（Redundancy Mitigation Rule: RMR）により，CPMサイズを削減し通信負荷を抑制する手法が検討されている~\cite{yamasaki2023,delooz}．しかし，V2V経路のみでは高CBR時のパケット衝突を避けられず，またRMRを単純に適用すると，認識に必要な物標情報や冗長性まで削除する可能性がある．
+
+そこで本研究では，V2Vによる局所的かつ低遅延な共有と，gNB設置MECを介したV2N2Vによる広域補完を組み合わせたHybrid CPM共有を評価する．特に，MEC側でCPM内の物標情報にRMRを適用し，V2N2V downlink fanoutによる負荷増大を抑えつつ，V2Vで失われた認識情報を補完することを目的とする．
+
+%---------------------------------------------------------------------
+\section{関連研究と課題}
+山崎らは，ETSIの冗長性緩和ルールを統合し，物標情報の冗長度に基づいてCPM内の情報を削除するRMRを提案した~\cite{yamasaki2023}．この方式はV2V負荷の低減に有効である一方，現在のCBRに基づく反応型制御であり，高密度環境では制御が間に合わない場合がある．また，V2VではCPMサイズを削減しても送信車両数そのものは変わらないため，sidelink上の競合が残る可能性がある．
+
+Aslamらは，メッセージ種別や要求遅延に応じてV2VとV2Nを使い分ける方式を検討している~\cite{Aslam2025}．しかし，CPMのように低遅延性と広域補完の両方が求められる情報では，経路を静的に割り当てるだけでは，V2V輻輳またはV2N downlink負荷のいずれかがボトルネックとなる．
+
+以上より，本研究では，V2Vのみ，V2N2Vのみ，および両経路を組み合わせたHybrid方式を比較し，高密度環境で各経路がどのような制約を持つかを明らかにする．
+
+%---------------------------------------------------------------------
+\section{Hybrid CPM共有方式}
+本研究で扱うHybrid方式では，各車両がCPMをV2V sidelinkで周辺車両へ送信するとともに，MECを介したV2N2V経路を補完経路として利用する．物標情報は距離，接近速度，衝突余裕時間（Time To Collision: TTC）に基づき高重要度または低重要度に分類する．高重要度情報はV2VとV2N2Vの両経路で送信し，低重要度情報は通信状況に応じてV2N2V転送を制御する．
+
+MECは各車両へ完全なLocal Dynamic Map（LDM）を配布するのではなく，各車両が生成したCPMを選択的に転送する．これにより，完全LDM配布によるdownlink fanout負荷を避けながら，V2Vで欠落した物標情報を補完する．さらに，MEC側ではRMRによりCPM内の低重要度または冗長な物標情報を削除し，V2N2V downlink required loadを容量内に抑えることを狙う．
+
+%---------------------------------------------------------------------
+\section{評価方法}
+VaN3Twin/ns-3とSUMOを用いて，高速道路直線区間に200台の車両が存在する高密度シナリオを評価した．CPMの有効認識TTLは高重要度・低重要度ともに0.2 sに統一した．また，V2VおよびV2N2Vの両経路にBG500相当の背景負荷を与え，高負荷条件における各方式の限界を確認した．
+
+評価指標として，物標認識率（Object Recognition Rate: ORR），重要度別ORR，V2V radio loss，MEC update failure，MEC AoI p99，およびMEC downlink required load ratioを用いる．Downlink busy ratioは容量超過時に1.0で飽和するため，過負荷の大きさを評価する際はrequired loadを容量で除した値を用いる．
+
+\begin{table}[t]
+  \caption{主要手法の評価結果（BG500，seed30，TTL 0.2/0.2）}
+  \label{tab:main_result}
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{2.2pt}
+  \begin{tabular}{lrrrr}
+    \hline
+    手法 & ORR & High & MEC失敗 & DL負荷 \\
+         & [\%] & ORR[\%] & [\%] & /容量 \\
+    \hline \hline
+    V2Vのみ & 52.64 & 62.33 & -- & -- \\
+    V2V+RMR & 44.25 & 54.30 & -- & -- \\
+    V2N2Vのみ & 13.92 & 24.48 & 100.00 & 7.38 \\
+    V2N2V+RMR & 13.92 & 24.48 & 100.00 & 4.73 \\
+    Hybrid & 63.30 & 70.53 & 82.52 & 2.34 \\
+    Hybrid+RMR & 97.78 & 98.78 & 25.50 & 0.90 \\
+    Hybrid+RMR+上限10 & 58.54 & 80.69 & 79.92 & 0.23 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+%---------------------------------------------------------------------
+\section{結果と考察}
+表~\ref{tab:main_result}に主要結果を示す．V2VのみではORRが52.64\%に留まり，V2V+RMRではORRが44.25\%へ低下した．両者の平均CBRはいずれも約0.80であり，V2V required load p99も容量比2.13であった．この結果から，V2VではCPM内の物標情報を削減しても，送信車両数によるsidelink競合は十分に緩和されず，RMRが有用な物標情報や冗長性を削除してしまう場合があると考えられる．
+
+V2N2Vのみでは，ORRは13.92\%であり，MEC update failureは100\%，MEC AoI p99は84.4 sであった．DL required load p99は容量比7.38に達しており，MECが多数の受信車両へCPMを転送するdownlink fanoutが支配的なボトルネックとなった．V2N2V+RMRではDL required load p99が容量比4.73まで低下したが，ORRは13.92\%のままであった．したがって，V2N2V単体ではRMRを適用しても鮮度を保ったCPM転送が困難である．
+
+Hybrid no RMRではORRが63.30\%となり，V2V単体より改善したものの，MEC update failureは82.52\%，DL required load p99は容量比2.34であった．これは，V2VとV2N2Vを単純に足し合わせるだけでは，V2N2V経路が鮮度を保った補完経路として機能しないことを示す．一方，Hybrid+RMRではORRが97.78\%，高重要度ORRが98.78\%に向上し，MEC AoI p99は248 ms，DL required load p99は容量比0.90に抑えられた．この結果から，Hybrid+RMRの改善は単なる帯域加算ではなく，MEC側RMRによりV2N2V経路を鮮度のある補完経路として成立させたことによると考えられる．
+
+また，Hybrid+RMRにMEC送信物標数上限10を併用した場合，DL required load p99は容量比0.23まで低下したが，ORRは58.54\%へ低下した．このことから，固定的な物標数制限は容量制御としては有効である一方，認識に必要な物標情報を過剰に削除する危険がある．今後は，単純な個数制限ではなく，重要度，受信冗長度RL，受信価値RV，および通信混雑の予測に基づいて，物標単位で送信経路と送信対象を選択する必要がある．
+
+%---------------------------------------------------------------------
+\section{まとめ}
+本稿では，高密度車両環境におけるCPM共有方式として，V2V，V2N2V，およびHybrid+RMRを比較評価した．V2Vのみではsidelink競合が残り，V2N2VのみではMEC downlink fanoutにより更新が陳腐化することを確認した．これに対し，Hybrid+RMRは，V2Vによる局所共有とV2N2Vによる広域補完を組み合わせ，さらにMEC側RMRによりdownlink負荷を容量内に抑えることで，高いORRを達成した．今後は，RL/RVや混雑予測を用いた物標単位の動的制御により，認識率と通信負荷の両立を図る．
+
+%---------------------------------------------------------------------
+\footnotesize{
+ \begin{thebibliography}{99}
+  \bibitem{digital_lifeline} 総務省, 「自動運転時代の“次世代のITS通信”研究会（第二期） 中間取りまとめ」, 2024年9月.
+  \bibitem{yamasaki2023} 山崎 慎也, 「車両の走行環境を考慮した協調認識メッセージにおける冗長性緩和手法」, 同志社大学 卒業論文, 2023.
+  \bibitem{Aslam2025} S. Aslam, et al., ``RSU-assisted V2X message fusion via PC5 and Uu with actor--critic modeling for autonomous driving under intersection scenario,'' Vehicular Communications, vol. 56, 100972, 2025.
+  \bibitem{delooz} Q. Delooz, et al., ``Analysis and Evaluation of Information Redundancy Mitigation for V2X Collective Perception,'' IEEE Access, vol. 10, pp. 47076--47093, 2022.
+ \end{thebibliography}
+}
+
+\end{document}

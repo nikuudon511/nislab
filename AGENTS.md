@@ -154,6 +154,18 @@ If more work is needed, stop and ask.
 
 This project uses Van3Twin and ns-3 for simulation research.
 
+## Research Onboarding
+
+When asked to understand current research progress, recover from a reset
+session, check evidence for a claim, or update research documentation, first
+read:
+
+* `docs/research/README.md`
+
+Then follow its read order.  Treat the files under `docs/research/` as the
+research knowledge base: progress, metric definitions, log schemas, experiment
+registry, and claim/evidence links.
+
 MUST verify existing implementation before suggesting code related to:
 
 * 802.11p

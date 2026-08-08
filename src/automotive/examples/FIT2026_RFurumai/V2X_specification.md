@@ -127,6 +127,7 @@ without recording the source.
 | UL capacity proxy | 90.468 Mbps | derived | 20 MHz * 4.5234 bit/s/Hz | Current lightweight capacity model default |
 | DL capacity proxy | 90.468 Mbps | derived | Same as UL; DL fanout is modeled by receiver-wise unicast serialization | Current lightweight capacity model default |
 | UL/DL capacity proxy, higher bandwidth | 180.936 Mbps | adopted sensitivity candidate | Same source-derived formula with 40 MHz bandwidth | Optional sensitivity run |
+| V2V load-ratio denominator | 6 Mbps | diagnostic proxy only | Conservative 802.11p/ITS-G5-style reference rate; not an NR-V2X PC5 physical-capacity claim | Used only to express V2V offered load in Mbps-style normalized form |
 | RMR CBR thresholds | 0.33 / 0.67 | prior-work setting | Yamazaki RMR method | Reactive and predictive RMR deletion phases |
 | RMR delete count | 10 / 20 / 40 objects | prior-work setting | Yamazaki RMR method | Maximum redundant objects deleted per CPM |
 | MEC V2N2V packet size | latest observed CPM size | implementation-derived | CPBasicService CPM serialization size | Uplink/downlink byte accounting and queueing |
@@ -149,6 +150,16 @@ This is a service-rate proxy for the lightweight queue model.  V2N2V uses Uu,
 so its actual bandwidth is determined by the mobile network operator and
 deployment; it is not legally fixed by the ITS PC5 band.  If a specific Uu
 carrier bandwidth is assumed, it must be stated explicitly and recorded here.
+
+The V2V-side `6 Mbps` value has a different status.  It is not used to claim
+that NR-V2X PC5 has only 6 Mbps of physical capacity.  It is a conservative
+diagnostic denominator inherited from common IEEE 802.11p/ITS-G5 beaconing
+practice, where 6 Mbps is a widely used reference data rate among the available
+10 MHz-channel rates.  In this study, V2V congestion conclusions should be
+argued from CBR, packet/update loss, and ORR under high vehicle density.  The
+V2V required/capacity ratio is only a supplemental way to express offered load
+in bandwidth-like units and should not be treated as the main evidence for a
+specific NR-V2X sidelink capacity.
 
 The simulation currently models MEC processing by delay parameters, but
 MEC-assisted collective perception also has a computation budget.  Hui Huang et
@@ -221,6 +232,55 @@ The main evaluation uses the source-derived capacity proxy listed in Section
 180.936 Mbps profile is reserved for bandwidth-sensitivity evaluation.  Other
 infrastructure traffic such as DENM and MAPEM should be modeled explicitly or
 handled by a separate sensitivity run, not by undocumented capacity tuning.
+
+### 4.3.1 MEC-Side Context Assumption
+
+The current lightweight V2N2V model assumes that MEC can access an idealized
+MEC-side context containing vehicle position, velocity, heading, and detected
+object information needed for receiver-specific forwarding and priority
+judgment.  This context is used only for MEC scheduling, receiver selection,
+and importance-aware filtering.  It is not directly injected into each vehicle's
+recognition state and is not counted as object recognition by itself.
+
+Therefore, the ORR metric remains receiver-side: an object is recognized only
+when the receiver obtains a valid local sensor update or a fresh CPM-derived
+cooperative update within the recognition TTL.  MEC-side context availability
+does not mean that all vehicles automatically possess a complete LDM.
+
+In a real deployment, this MEC-side context would be constructed from periodic
+vehicle uplink reports such as CAM/CPM-equivalent state and perceived-object
+messages.  The current evaluation does not model context-update latency,
+positioning error, uplink missing reports, or MEC-side state-estimation error.
+Thus, results using receiver-specific MEC priority judgment should be described
+as an upper-bound or ideal-context evaluation of MEC scheduling, not as a full
+implementation of an error-prone MEC LDM.
+
+For future sensitivity analysis, add delayed/noisy/incomplete MEC-side context
+models before claiming robustness in practical deployment.
+
+### 4.3.2 Partial-Context Forwarding Interpretation
+
+This study should not be described as distributing a complete MEC LDM to every
+vehicle.  Sending a complete global or local dynamic map to all vehicles would
+amplify MEC downlink fanout and can exceed the V2N2V downlink capacity proxy in
+dense traffic.
+
+The intended interpretation is partial-context forwarding:
+
+1. Vehicles generate and share CPM information judged useful from their local
+   sensing and priority context.
+2. MEC uses its scheduling context to forward only selected parts of that
+   information to a wider receiver set.
+3. Each receiver builds its own recognition state from local sensing, V2V CPMs,
+   and selected V2N2V CPM updates.
+4. RMR and route control try to maximize receiver-side fresh object recognition
+   while minimizing V2V CBR pressure and V2N2V downlink fanout load.
+
+This is conceptually close to a late-fusion or selective-fusion design rather
+than early fusion of a complete shared LDM.  MEC performs importance-aware
+selection and dissemination, but the final recognized object set is still
+formed at each receiving vehicle.  This wording avoids implying that MEC
+centrally computes a perfect LDM and broadcasts it wholesale to every vehicle.
 
 ### 4.4 UL/DL Radio Loss and Retransmission Model
 
@@ -340,6 +400,27 @@ The 0.2 s TTL is intended to tolerate roughly one missed update, retransmission,
 or moderate delivery delay, but updates older than this are treated as stale and
 are not counted as valid recognition.  This keeps ORR tied to fresh cooperative
 perception rather than long-lived recognition state.
+
+### 5.2 Receiver-Side Redundancy Level
+
+Receiver-side redundancy level (RL) is defined from the receiver vehicle's point
+of view.  For each expected object, RL is the number of valid recognition
+updates available within that object's recognition TTL window:
+
+- `RL = 0`: the object is not currently recognized.
+- `RL = 1`: the object is recognized once within TTL.
+- `RL = 2`: the object has two valid recognition updates within TTL.
+- `RL >= 3`: the object has three or more valid recognition updates within TTL.
+
+Direct sensor recognition counts as one valid update.  Cooperative CPM updates
+also count if they are within the applicable high/low-priority recognition TTL.
+RL does not distinguish whether a cooperative update came from sidelink or MEC;
+the metric is receiver-centric rather than route-centric.
+
+Under this definition, `RL >= 1` is the RL-form of ORR for the same priority
+class and denominator, while `RL >= 2` and the RL histogram describe redundancy
+among recognized objects.  Reports should prefer the RL distribution
+(`RL=0`, `RL=1`, `RL=2`, `RL>=3`) and p50/p90/p99 over the mean alone.
 
 ## 6. Drop Reasons
 
@@ -482,6 +563,34 @@ Prediction policy:
 The intended research claim is that bandwidth prediction improves RMR only when
 combined with important-information protection.  Prediction by itself can make
 ORR worse if it overestimates congestion and removes useful updates.
+
+### 6.4 Hybrid Route Control and Sensitivity
+
+The hybrid method is not a simple sum of V2V and V2N2V bandwidth.  It is a
+route-control policy that assigns different roles to the two paths:
+
+- NR sidelink V2V is the primary local broadcast path.
+- MEC V2N2V is a complementary path for recovery/extension under congestion.
+- High-priority information may be dual-transmitted over both paths when
+  `hybrid-high-dual-tx=true`.
+- Low-priority MEC forwarding may be controlled by adaptive probability.
+
+Implementation note:
+
+- In the current hybrid implementation, NR/V2V uses primary RMR forwarding.
+- MEC offload mode forwards objects removed from the primary path.
+- MEC duplicate mode can carry the complementary CPM path rather than
+  suppressing receiver fanout.
+
+Therefore, Hybrid+RMR results must not be interpreted as RMR-only evidence
+unless route-control settings are fixed or ablated.  Final evaluation should
+treat route control as a sensitivity axis, including:
+
+- `hybrid-high-dual-tx`
+- `mec-recovery-policy`
+- `mec-adaptive-low-max-prob`
+- `switch-cbr`, `release-cbr`, and `hybrid-cbr-max`
+- `mec-min-hold-time`
 
 ## 7. Comparison Methods
 

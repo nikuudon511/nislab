@@ -19,10 +19,12 @@ RELEASE_CBR=${RELEASE_CBR:-0.5}
 HYBRID_CBR_MAX=${HYBRID_CBR_MAX:-0.8}
 HYBRID_LOW_V2V_MIN_PROB=${HYBRID_LOW_V2V_MIN_PROB:-0.2}
 HYBRID_LOW_V2V_ALPHA=${HYBRID_LOW_V2V_ALPHA:-1}
+HYBRID_HIGH_DUAL_TX=${HYBRID_HIGH_DUAL_TX:-true}
 
 RMR_CBR_LOW=${RMR_CBR_LOW:-0.33}
 RMR_CBR_HIGH=${RMR_CBR_HIGH:-0.67}
 REACTIVE_RMR=${REACTIVE_RMR:-false}
+V2V_REACTIVE_RMR=${V2V_REACTIVE_RMR:-true}
 RMR_DELETE_LOW=${RMR_DELETE_LOW:-10}
 RMR_DELETE_MIDDLE=${RMR_DELETE_MIDDLE:-20}
 RMR_DELETE_HIGH=${RMR_DELETE_HIGH:-40}
@@ -32,7 +34,11 @@ RMR_GUARD_HARD_TTC=${RMR_GUARD_HARD_TTC:-3}
 PREDICTIVE_RMR=${PREDICTIVE_RMR:-false}
 PREDICTIVE_RMR_MAX_CBR=${PREDICTIVE_RMR_MAX_CBR:-0.95}
 PREDICTIVE_RMR_SMOOTHING_ALPHA=${PREDICTIVE_RMR_SMOOTHING_ALPHA:-0.3}
+PREDICTIVE_DL_LOAD_CONTROL=${PREDICTIVE_DL_LOAD_CONTROL:-false}
+PREDICTIVE_DL_LOAD_LEAD_SECONDS=${PREDICTIVE_DL_LOAD_LEAD_SECONDS:-3}
+PREDICTIVE_DL_LOAD_SMOOTHING_ALPHA=${PREDICTIVE_DL_LOAD_SMOOTHING_ALPHA:-0.5}
 MEC_IDEAL_RMR_MODE=${MEC_IDEAL_RMR_MODE:-object}
+MEC_IDEAL_RMR_ENABLED=${MEC_IDEAL_RMR_ENABLED:-true}
 MEC_IDEAL_RMR_LONGTAIL=${MEC_IDEAL_RMR_LONGTAIL:-false}
 MEC_IDEAL_RMR_LONGTAIL_VERY_HIGH_CBR=${MEC_IDEAL_RMR_LONGTAIL_VERY_HIGH_CBR:-0.85}
 MEC_IDEAL_RMR_LONGTAIL_EXTREME_CBR=${MEC_IDEAL_RMR_LONGTAIL_EXTREME_CBR:-0.95}
@@ -59,6 +65,7 @@ MEC_PROCESSING_DELAY_MS=${MEC_PROCESSING_DELAY_MS:-0}
 MEC_FORWARD_RANGE=${MEC_FORWARD_RANGE:-200}
 MEC_RECOVERY_POLICY=${MEC_RECOVERY_POLICY:-staged}
 MEC_OBJECT_POLICY=${MEC_OBJECT_POLICY:-all-objects}
+MEC_OBJECT_LIMIT=${MEC_OBJECT_LIMIT:-0}
 MEC_ADAPTIVE_LOW_MAX_PROB=${MEC_ADAPTIVE_LOW_MAX_PROB:-0.5}
 MEC_MIN_HOLD_TIME=${MEC_MIN_HOLD_TIME:-5}
 MEC_IDEAL_LINK=${MEC_IDEAL_LINK:-true}
@@ -170,9 +177,21 @@ for method in $METHODS; do
       run_method="predictive-rmr-v2n2v"
       run_mec_object_policy="high-priority-only"
       ;;
+    v2n2v-only-high-priority)
+      run_method="v2n2v-only"
+      run_mec_object_policy="high-priority-only"
+      ;;
+    v2n2v-source-high-with-low)
+      run_method="v2n2v-only"
+      run_mec_object_policy="source-high-with-low"
+      ;;
     v2n2v-adaptive-probability)
       run_method="hybrid-v2v-v2n2v"
       run_mec_object_policy="adaptive-probability"
+      ;;
+    hybrid-high-priority-only)
+      run_method="hybrid-v2v-v2n2v"
+      run_mec_object_policy="high-priority-only"
       ;;
   esac
 
@@ -189,8 +208,16 @@ for method in $METHODS; do
     echo "SUMO_CONFIG=$SUMO_CONFIG"
     echo "MAX_COMMUNICATION_VEHICLES=$MAX_COMMUNICATION_VEHICLES"
     echo "REACTIVE_RMR=$REACTIVE_RMR"
+    echo "V2V_REACTIVE_RMR=$V2V_REACTIVE_RMR"
     echo "RMR_DELETE=$RMR_DELETE_LOW/$RMR_DELETE_MIDDLE/$RMR_DELETE_HIGH"
     echo "RMR_GUARD_IMPORTANT=$RMR_GUARD_IMPORTANT"
+    echo "HYBRID_HIGH_DUAL_TX=$HYBRID_HIGH_DUAL_TX"
+    echo "TRAFFIC_FLOW_CHANNEL_RATE_MBPS=$TRAFFIC_FLOW_CHANNEL_RATE_MBPS"
+    echo "PREDICTIVE_RMR=$PREDICTIVE_RMR"
+    echo "PREDICTIVE_DL_LOAD_CONTROL=$PREDICTIVE_DL_LOAD_CONTROL"
+    echo "PREDICTIVE_DL_LOAD_LEAD_SECONDS=$PREDICTIVE_DL_LOAD_LEAD_SECONDS"
+    echo "PREDICTIVE_DL_LOAD_SMOOTHING_ALPHA=$PREDICTIVE_DL_LOAD_SMOOTHING_ALPHA"
+    echo "MEC_IDEAL_RMR_ENABLED=$MEC_IDEAL_RMR_ENABLED"
     echo "MEC_IDEAL_RMR_MODE=$MEC_IDEAL_RMR_MODE"
     echo "MEC_IDEAL_RMR_LONGTAIL=$MEC_IDEAL_RMR_LONGTAIL"
     echo "MEC_IDEAL_RMR_DELETE_VERY_HIGH=$MEC_IDEAL_RMR_DELETE_VERY_HIGH"
@@ -201,6 +228,7 @@ for method in $METHODS; do
     echo "MEC_IDEAL_AOI_FILTER_THRESHOLD_MS=$MEC_IDEAL_AOI_FILTER_THRESHOLD_MS"
     echo "MEC_FORWARD_RANGE=$MEC_FORWARD_RANGE"
     echo "MEC_OBJECT_POLICY=$run_mec_object_policy"
+    echo "MEC_OBJECT_LIMIT=$MEC_OBJECT_LIMIT"
     echo "HIGH_PRIORITY_CPM_RECOGNITION_TTL=$HIGH_PRIORITY_CPM_RECOGNITION_TTL"
     echo "LOW_PRIORITY_CPM_RECOGNITION_TTL=$LOW_PRIORITY_CPM_RECOGNITION_TTL"
     echo "ORR_RANGE=$ORR_RANGE"
@@ -253,9 +281,11 @@ for method in $METHODS; do
     --hybrid-cbr-max=$HYBRID_CBR_MAX \
     --hybrid-low-v2v-min-prob=$HYBRID_LOW_V2V_MIN_PROB \
     --hybrid-low-v2v-alpha=$HYBRID_LOW_V2V_ALPHA \
+    --hybrid-high-dual-tx=$HYBRID_HIGH_DUAL_TX \
     --rmr-cbr-low=$RMR_CBR_LOW \
     --rmr-cbr-high=$RMR_CBR_HIGH \
     --reactive-rmr=$REACTIVE_RMR \
+    --v2v-reactive-rmr=$V2V_REACTIVE_RMR \
     --predictive-rmr=$PREDICTIVE_RMR \
     --rmr-delete-low=$RMR_DELETE_LOW \
     --rmr-delete-middle=$RMR_DELETE_MIDDLE \
@@ -265,6 +295,10 @@ for method in $METHODS; do
     --rmr-guard-hard-ttc=$RMR_GUARD_HARD_TTC \
     --predictive-rmr-max-cbr=$PREDICTIVE_RMR_MAX_CBR \
     --predictive-rmr-smoothing-alpha=$PREDICTIVE_RMR_SMOOTHING_ALPHA \
+    --predictive-dl-load-control=$PREDICTIVE_DL_LOAD_CONTROL \
+    --predictive-dl-load-lead-seconds=$PREDICTIVE_DL_LOAD_LEAD_SECONDS \
+    --predictive-dl-load-smoothing-alpha=$PREDICTIVE_DL_LOAD_SMOOTHING_ALPHA \
+    --mec-ideal-rmr-enabled=$MEC_IDEAL_RMR_ENABLED \
     --mec-ideal-rmr-mode=$MEC_IDEAL_RMR_MODE \
     --mec-ideal-rmr-longtail=$MEC_IDEAL_RMR_LONGTAIL \
     --mec-ideal-rmr-longtail-very-high-cbr=$MEC_IDEAL_RMR_LONGTAIL_VERY_HIGH_CBR \
@@ -291,6 +325,7 @@ for method in $METHODS; do
     --mec-forward-range=$MEC_FORWARD_RANGE \
     --mec-recovery-policy=$MEC_RECOVERY_POLICY \
     --mec-object-policy=$run_mec_object_policy \
+    --mec-object-limit=$MEC_OBJECT_LIMIT \
     --mec-adaptive-low-max-prob=$MEC_ADAPTIVE_LOW_MAX_PROB \
     --mec-min-hold-time=$MEC_MIN_HOLD_TIME \
     --mec-ideal-link=$MEC_IDEAL_LINK \
